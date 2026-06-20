@@ -1,0 +1,26 @@
+# ── Secrets — NEVER commit these ──────────────────────────────────────
+.streamlit/secrets.toml
+*.env
+.env
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.ipynb_checkpoints/
+
+# ── Conda / venv ────────────────────────────────────────────────────
+.conda/
+venv/
+env/
+ENV/
+
+# ── Editor / OS cruft ───────────────────────────────────────────────
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ── Generated outputs (user data, not source code) ─────────────────
+/uploads/
+*.docx
