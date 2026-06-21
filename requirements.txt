@@ -20,7 +20,7 @@ evidently==0.7.21
 shap==0.52.0
 
 # Math, Stats, & Causal
-scipy>=1.17.0
+scipy>=1.10.0,<1.17.0
 statsmodels>=0.14.0
 networkx
 dowhy
