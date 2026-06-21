@@ -18,6 +18,12 @@ from pages import report  # Added for Phase 11 Report Generator
 from pages import forecast
 from pages import anomaly
 from pages import nlpqa  # Added Step 9 - was missing despite module existing (Phase 11.5)
+from pages import excel_intelligence_ui
+from pages import sql_agent_ui
+from pages import automl
+from pages import experiments
+from pages import causal
+from pages import deep_learning
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title=APP_NAME,
@@ -265,14 +271,20 @@ NAV = {
     "🏠 Home": ("home", None),
     "— DATA —": None,
     "📁 Upload Data":        ("upload",    None),
+    "🗂️ Multi-Sheet Excel": ("excel_intelligence_ui", None),
     "🧹 Data Cleaning":      ("cleaning",  "df"),
     "— ANALYSIS —": None,
     "🔬 EDA":                ("eda",       "df"),
     "📊 Pivot Tables":       ("pivot",     "df"),
     "📈 Visualizations":     ("viz",       "df"),
     "📐 Statistical Engine": ("stats",     "df"),
+    "🧪 A/B Testing":        ("experiments", "df"),
+    "🔗 Causal Inference":   ("causal",      "df"),
+    "🗄️ SQL Agent": ("sql_agent_ui", None),
     "— INTELLIGENCE —": None,
     "🤖 Machine Learning":   ("ml",        "df"),
+    "🧬 AutoML Engine":      ("automl",    "df"),
+    "⚡ Deep Learning":      ("deep_learning", "df"),
     "🧠 Auto Questions":    ("questions", "df"),
     "🤖 Multi-Agent System": ("agents_ui", "df"),
     "🔮 Forecasting":        ("forecast",  "df"),
@@ -421,6 +433,9 @@ elif page == "📁 Upload Data":
     from pages.upload import render
     render()
 
+elif page == "🗂️ Multi-Sheet Excel":
+       excel_intelligence_ui.show()
+
 # ── ROUTING FOR DATA CLEANING ────────────────────────────────────────────────
 elif page == "🧹 Data Cleaning":
     if "df" not in st.session_state or st.session_state["df"] is None:
@@ -456,12 +471,39 @@ elif page == "📐 Statistical Engine":
     else:
         stats.show()
 
+elif page == "🧪 A/B Testing":
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        experiments.show()
+
+elif page == "🔗 Causal Inference":
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        causal.show()
+
+elif page == "🗄️ SQL Agent":
+       sql_agent_ui.show()
+
 elif page == "🤖 Machine Learning":
     if "df" not in st.session_state or st.session_state["df"] is None:
         needs_data()
     else:
         from pages.ml import show
         show()
+
+elif page == "🧬 AutoML Engine":
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        automl.show()
+
+elif page == "⚡ Deep Learning":
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        deep_learning.show()
 
 elif page == "🧠 Auto Questions":
     if "df" not in st.session_state or st.session_state["df"] is None:

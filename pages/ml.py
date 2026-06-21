@@ -7,6 +7,10 @@ from config.settings import (
     PRIMARY_COLOR, BACKGROUND_COLOR, SURFACE_COLOR,
     TEXT_COLOR, ACCENT_COLOR
 )
+from agents.explainability import (
+    compute_shap_values, get_population_view, get_row_view,
+    get_mean_abs_importance, ExplainabilityError
+)
 
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
@@ -108,12 +112,13 @@ def show():
                  "Use Data Cleaning → Data Type Fixer first.")
         return
 
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🎯 Problem Setup",
-        "📊 Train & Evaluate",
-        "🔍 Feature Importance",
-        "💾 Export Model"
-    ])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🎯 Problem Setup",
+    "📊 Train & Evaluate",
+    "🔍 Feature Importance",
+    "💾 Export Model",
+    "🧠 Explainability"
+])
 
     with tab1:
         _problem_setup(df, numeric_cols, all_cols)
@@ -127,7 +132,9 @@ def show():
     with tab4:
         _export_model()
 
-
+    with tab5:
+        _explainability_tab()
+        
 # ── Tab 1: Problem Setup ─────────────────────────────────────────────────────
 def _problem_setup(df, numeric_cols, all_cols):
     st.divider()
@@ -290,6 +297,127 @@ def _problem_setup(df, numeric_cols, all_cols):
 
 
 # ── Stubs for tabs 2-4 (built in next steps) ─────────────────────────────────
+def _build_model_map(seed):
+    """Returns the full dict of model_name -> instantiated estimator.
+    Shared by both single-model training and Compare All Models mode,
+    so the two paths can never drift out of sync with each other."""
+    from sklearn.linear_model import (LinearRegression, Ridge,
+                                      Lasso, LogisticRegression)
+    from sklearn.ensemble import (RandomForestRegressor,
+                                  RandomForestClassifier)
+    from sklearn.neighbors import KNeighborsClassifier
+    from sklearn.tree import DecisionTreeClassifier
+    from xgboost import XGBRegressor, XGBClassifier
+    from lightgbm import LGBMRegressor, LGBMClassifier
+    from catboost import CatBoostRegressor, CatBoostClassifier
+
+    return {
+        "Linear Regression":          LinearRegression(),
+        "Ridge Regression":           Ridge(),
+        "Lasso Regression":           Lasso(),
+        "Random Forest Regressor":    RandomForestRegressor(
+                                          n_estimators=100,
+                                          random_state=seed),
+        "Logistic Regression":        LogisticRegression(
+                                          max_iter=1000,
+                                          random_state=seed),
+        "Random Forest Classifier":   RandomForestClassifier(
+                                          n_estimators=100,
+                                          random_state=seed),
+        "K-Nearest Neighbors":        KNeighborsClassifier(),
+        "Decision Tree Classifier":   DecisionTreeClassifier(
+                                          random_state=seed),
+        "XGBoost Regressor":          XGBRegressor(
+                                          random_state=seed),
+        "XGBoost Classifier":         XGBClassifier(
+                                          random_state=seed,
+                                          eval_metric="logloss"),
+        "LightGBM Regressor":         LGBMRegressor(
+                                          random_state=seed,
+                                          verbose=-1),
+        "LightGBM Classifier":        LGBMClassifier(
+                                          random_state=seed,
+                                          verbose=-1),
+        "CatBoost Regressor":         CatBoostRegressor(
+                                          random_seed=seed,
+                                          verbose=False),
+        "CatBoost Classifier":        CatBoostClassifier(
+                                          random_seed=seed,
+                                          verbose=False)
+    }
+
+
+def _render_model_comparison(model_map, problem_type, X_train, X_test, y_train, y_test):
+    """Trains every available algorithm for the current problem type on the
+    identical split, ranks by the primary metric, shows a styled table +
+    bar chart. Reuses _metric_card and the project's established
+    .style.map() color-coding pattern (see pages/executive.py)."""
+    import plotly.graph_objects as go
+    from sklearn.metrics import r2_score, mean_squared_error, accuracy_score
+
+    candidates = _get_model_options(problem_type)
+    rows = []
+    progress = st.progress(0, text="Benchmarking models...")
+
+    for i, name in enumerate(candidates):
+        model = model_map[name]
+        try:
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            if problem_type == "Regression":
+                rows.append({
+                    "Model": name,
+                    "R² Score": round(r2_score(y_test, y_pred), 4),
+                    "RMSE": round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
+                })
+            else:
+                rows.append({
+                    "Model": name,
+                    "Accuracy": round(accuracy_score(y_test, y_pred), 4),
+                })
+        except Exception as e:
+            rows.append({"Model": name, "Error": str(e)[:80]})
+        progress.progress((i + 1) / len(candidates), text=f"Trained {name}")
+
+    progress.empty()
+    results_df = pd.DataFrame(rows)
+    primary_metric = "R² Score" if problem_type == "Regression" else "Accuracy"
+
+    if primary_metric in results_df.columns:
+        results_df = results_df.sort_values(primary_metric, ascending=False).reset_index(drop=True)
+
+    st.markdown("### 🏆 Model Comparison Results")
+
+    def _highlight_best(val):
+        if val == results_df[primary_metric].max():
+            return "background-color: #E8F3EC; font-weight: bold;"
+        return ""
+
+    if primary_metric in results_df.columns:
+        styled = results_df.style.map(_highlight_best, subset=[primary_metric])
+        st.dataframe(styled, hide_index=True, width='stretch')
+    else:
+        st.dataframe(results_df.astype(str), hide_index=True, width='stretch')
+
+    if primary_metric in results_df.columns:
+        chart_df = results_df.dropna(subset=[primary_metric])
+        fig = go.Figure(go.Bar(
+            x=chart_df["Model"], y=chart_df[primary_metric],
+            marker_color=PRIMARY_COLOR
+        ))
+        fig.update_layout(
+            paper_bgcolor=BACKGROUND_COLOR, plot_bgcolor=BACKGROUND_COLOR,
+            font_color=TEXT_COLOR, title=f"{primary_metric} by Model",
+            title_font_color=PRIMARY_COLOR,
+            yaxis=dict(gridcolor="#333"), margin=dict(t=60, b=80), height=420
+        )
+        st.plotly_chart(fig, width='stretch')
+
+    best_name = results_df.iloc[0]["Model"] if primary_metric in results_df.columns else None
+    if best_name:
+        st.success(f"🥇 Best performer: **{best_name}** — go to Problem Setup and select it to train and export this model.")
+
+
 def _train_evaluate(df):
     import plotly.express as px
     import plotly.graph_objects as go
@@ -301,6 +429,9 @@ def _train_evaluate(df):
                                   RandomForestClassifier)
     from sklearn.neighbors import KNeighborsClassifier
     from sklearn.tree import DecisionTreeClassifier
+    from xgboost import XGBRegressor, XGBClassifier
+    from lightgbm import LGBMRegressor, LGBMClassifier
+    from catboost import CatBoostRegressor, CatBoostClassifier
     from sklearn.metrics import (
         r2_score, mean_squared_error,
         accuracy_score, confusion_matrix,
@@ -323,9 +454,14 @@ def _train_evaluate(df):
     st.divider()
     st.markdown("### 🚀 Train Model")
 
-    if not st.button("▶️ Run Training", width='stretch',
-                     key="ml_run_training"):
-        st.info("Click **Run Training** to train your model.", icon="👆")
+    col_a, col_b = st.columns(2)
+    run_single = col_a.button("▶️ Run Training", width='stretch', key="ml_run_training")
+    run_compare = col_b.button("🏆 Compare All Models", width='stretch', key="ml_run_compare")
+
+    if not run_single and not run_compare:
+        st.info("Click **Run Training** to train your selected model, or "
+                "**Compare All Models** to benchmark every available "
+                "algorithm on the same split.", icon="👆")
         return
 
     # ── Preprocess ───────────────────────────────────────────────────────────
@@ -370,24 +506,13 @@ def _train_evaluate(df):
         X_train = scaler.fit_transform(X_train)
         X_test  = scaler.transform(X_test)
 
+    if run_compare:
+        model_map = _build_model_map(seed)
+        _render_model_comparison(model_map, problem_type, X_train, X_test, y_train, y_test)
+        return
+
     # ── Build model ──────────────────────────────────────────────────────────
-    model_map = {
-        "Linear Regression":          LinearRegression(),
-        "Ridge Regression":           Ridge(),
-        "Lasso Regression":           Lasso(),
-        "Random Forest Regressor":    RandomForestRegressor(
-                                          n_estimators=100,
-                                          random_state=seed),
-        "Logistic Regression":        LogisticRegression(
-                                          max_iter=1000,
-                                          random_state=seed),
-        "Random Forest Classifier":   RandomForestClassifier(
-                                          n_estimators=100,
-                                          random_state=seed),
-        "K-Nearest Neighbors":        KNeighborsClassifier(),
-        "Decision Tree Classifier":   DecisionTreeClassifier(
-                                          random_state=seed)
-    }
+    model_map = _build_model_map(seed)
 
     model = model_map[model_name]
 
@@ -785,6 +910,122 @@ def _corr_label(val):
     else:
         return "Negligible"
 
+
+# ── Tab 5: Explainability ─────────────────────────────────────────────────────
+def _explainability_tab():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import shap
+    import warnings
+
+    if "ml_config" not in st.session_state:
+        st.info("⚙️ Complete **Problem Setup** first.", icon="👆")
+        return
+    if "ml_model" not in st.session_state:
+        st.info("⚙️ Train a model in **📊 Train & Evaluate** first.",
+                icon="👆")
+        return
+
+    model    = st.session_state["ml_model"]
+    X_test   = st.session_state["ml_X_test"]
+    features = st.session_state["ml_features_list"]
+    cfg      = st.session_state["ml_config"]
+    problem_type = cfg["problem_type"]
+
+    st.divider()
+    st.markdown("### 🧠 Model Explainability (SHAP)")
+
+    if not hasattr(model, "feature_importances_"):
+        st.warning(
+            f"SHAP explanations are only available for tree-based models "
+            f"(Random Forest, Decision Tree). **{cfg['model_choice']}** isn't "
+            f"tree-based, so this tab can't explain it. Retrain with a "
+            f"Random Forest or Decision Tree model to use this tab."
+        )
+        return
+
+    # X_test is a raw numpy array (scaler.transform output) in ml_config's
+    # training flow — wrap with feature names for SHAP's plot labels, and
+    # suppress the harmless "fitted without feature names" warning this
+    # causes since the model itself was trained on an unlabeled array.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+        X_test_df = pd.DataFrame(X_test, columns=features)
+
+        with st.spinner("Computing SHAP values..."):
+            try:
+                shap_result = compute_shap_values(model, X_test_df, problem_type)
+            except ExplainabilityError as e:
+                st.error(f"Could not compute SHAP explanations: {e}")
+                return
+
+    is_classification = shap_result["is_classification"]
+    class_idx = 0
+    if is_classification:
+        n_classes = shap_result["n_classes"]
+        class_idx = st.selectbox(
+            "Class to explain (population-level views below)",
+            options=list(range(n_classes)),
+            format_func=lambda i: f"Class {i}",
+            key="shap_class_idx",
+        )
+
+    st.markdown("#### 🐝 Summary Plot (Beeswarm)")
+    st.caption(
+        "Shows how much each feature pushes predictions up or down, "
+        "across all test rows."
+        + (" Fixed to the class selected above." if is_classification else "")
+    )
+    pop_view = get_population_view(shap_result, class_idx=class_idx if is_classification else None)
+    fig1, ax1 = plt.subplots()
+    shap.summary_plot(pop_view, X_test_df, show=False)
+    st.pyplot(fig1, width="stretch")
+    plt.close(fig1)
+
+    st.divider()
+    st.markdown("#### 💧 Per-Prediction Waterfall")
+    st.caption(
+        "Explains one specific row's prediction. For classification, this "
+        "always shows that row's own predicted class — not the class "
+        "selected above, since each row may predict a different class."
+    )
+    row_idx = st.number_input(
+        "Test row index to explain",
+        min_value=0, max_value=len(X_test_df) - 1, value=0, step=1,
+        key="shap_row_idx",
+    )
+    row_view, predicted_class = get_row_view(shap_result, int(row_idx))
+    if is_classification:
+        st.caption(f"This row's predicted class: **{predicted_class}**")
+    fig2, ax2 = plt.subplots()
+    shap.waterfall_plot(row_view, show=False)
+    st.pyplot(fig2, width="stretch")
+    plt.close(fig2)
+
+    st.divider()
+    st.markdown("#### 📈 Partial Dependence — Top Features")
+    st.caption(
+        "Shows how the model's prediction changes as one feature varies, "
+        "holding others at their average effect."
+    )
+    importance_df = get_mean_abs_importance(
+        shap_result, features, class_idx=class_idx if is_classification else None
+    )
+    top_n = min(4, len(features))
+    top_features = importance_df["feature"].head(top_n).tolist()
+
+    from sklearn.inspection import PartialDependenceDisplay
+    fig3, axes = plt.subplots(1, top_n, figsize=(4 * top_n, 4))
+    if top_n == 1:
+        axes = [axes]
+    PartialDependenceDisplay.from_estimator(
+        model, X_test_df, features=top_features, ax=axes
+    )
+    st.pyplot(fig3, width="stretch")
+    plt.close(fig3)
+
+
 def _export_model():
     import joblib
     import os
@@ -1001,12 +1242,18 @@ def _get_model_options(problem_type):
             "Linear Regression",
             "Random Forest Regressor",
             "Ridge Regression",
-            "Lasso Regression"
+            "Lasso Regression",
+            "XGBoost Regressor",
+            "LightGBM Regressor",
+            "CatBoost Regressor"
         ]
     else:
         return [
             "Logistic Regression",
             "Random Forest Classifier",
             "K-Nearest Neighbors",
-            "Decision Tree Classifier"
+            "Decision Tree Classifier",
+            "XGBoost Classifier",
+            "LightGBM Classifier",
+            "CatBoost Classifier"
         ]

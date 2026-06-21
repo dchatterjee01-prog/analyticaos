@@ -39,26 +39,25 @@ def _inject_css():
         margin-top: 0.2rem;
     }}
     .clean-badge {{
-    background: {SUCCESS_BG};
-    color: {SUCCESS_COLOR};
-    border: 1px solid {SUCCESS_COLOR};
-    border-radius: 20px;
-    padding: 0.25rem 0.9rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    display: inline-block;
-}}
-.warn-badge {{
-    background: {WARNING_BG};
-    color: {WARNING_COLOR};
-    border: 1px solid {WARNING_COLOR};
-    border-radius: 20px;
-    padding: 0.25rem 0.9rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    display: inline-block;
-}}
-    
+        background: {SUCCESS_BG};
+        color: {SUCCESS_COLOR};
+        border: 1px solid {SUCCESS_COLOR};
+        border-radius: 20px;
+        padding: 0.25rem 0.9rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }}
+    .warn-badge {{
+        background: {WARNING_BG};
+        color: {WARNING_COLOR};
+        border: 1px solid {WARNING_COLOR};
+        border-radius: 20px;
+        padding: 0.25rem 0.9rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: inline-block;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -156,6 +155,95 @@ def show():
         st.warning("⚠️ No dataset loaded. Please upload a file first.")
         return
 
+    # --- Stage A / Step Group 1 / Step 1: Reference dataset for drift detection ---
+    with st.expander("📊 Drift Detection Setup (optional)", expanded=False):
+        st.caption(
+            "Upload a reference dataset (e.g. last month's data, or a known-good "
+            "snapshot) to enable drift detection against your current dataset."
+        )
+
+        ref_file = st.file_uploader(
+            "Reference dataset (.csv)",
+            type=["csv"],
+            key="drift_reference_uploader",
+        )
+
+        if ref_file is not None:
+            try:
+                ref_df = pd.read_csv(ref_file)
+                st.session_state["drift_reference_df"] = ref_df
+                st.success(
+                    f"Reference dataset loaded: {ref_df.shape[0]:,} rows × "
+                    f"{ref_df.shape[1]} columns"
+                )
+            except Exception as e:
+                st.error(f"Could not read reference dataset: {e}")
+
+        if "drift_reference_df" in st.session_state:
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(
+                    "Reference rows",
+                    f"{st.session_state['drift_reference_df'].shape[0]:,}",
+                )
+            with col2:
+                if st.button("Clear reference dataset", width="stretch"):
+                    del st.session_state["drift_reference_df"]
+                    st.rerun()
+        else:
+            st.info("No reference dataset set. Drift detection will be unavailable until one is uploaded.")
+
+    # --- Stage A / Step Group 1 / Step 3: Show drift + trust results ---
+    agent_report = st.session_state.get("agent_report")
+    dq_result = (agent_report or {}).get("results", {}).get("DataQualityAgent")
+
+    if dq_result is not None:
+        drift = dq_result.artifacts.get("drift", {})
+        trust = dq_result.artifacts.get("trust", {})
+
+        if drift.get("drift_available") or trust.get("trust_available"):
+            st.markdown("##### Drift & Trust Results")
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                if drift.get("drift_available"):
+                    n_drifted = drift.get("n_drifted_columns", 0)
+                    n_checked = drift.get("n_columns_checked", 0)
+                    st.metric("Columns drifted", f"{n_drifted} / {n_checked}")
+                else:
+                    st.metric("Columns drifted", "—")
+
+            with col2:
+                if drift.get("drift_available") and drift.get("drift_share") is not None:
+                    st.metric("Drift share", f"{drift['drift_share']*100:.1f}%")
+                else:
+                    st.metric("Drift share", "—")
+
+            with col3:
+                if trust.get("trust_available") and trust.get("trust_pass_rate") is not None:
+                    st.metric("Trust pass rate", f"{trust['trust_pass_rate']*100:.1f}%")
+                else:
+                    st.metric("Trust pass rate", "—")
+
+            if drift.get("drift_available") and drift.get("drifted_columns"):
+                st.warning(
+                    f"Drifted columns: {', '.join(drift['drifted_columns'])}"
+                )
+            elif drift.get("drift_available"):
+                st.success("No drift detected in any shared column.")
+
+            if drift.get("drift_error"):
+                st.caption(f"Note: {drift['drift_error']}")
+        elif "drift_reference_df" in st.session_state:
+            st.info(
+                "Reference dataset is loaded, but the Multi-Agent Analysis "
+                "hasn't run yet. Go to the Multi-Agent Analysis page and click "
+                "'Run Multi-Agent Analysis' to compute drift and trust results."
+            )
+
+    # ════════════════════════════════════════════════════════════════
+    # SECTION 1 — MISSING VALUE SUMMARY
+    # ════════════════════════════════════════════════════════════════
     total_cells   = df.size
     total_missing = df.isnull().sum().sum()
     overall_pct   = round(total_missing / total_cells * 100, 2)
@@ -214,6 +302,7 @@ def show():
         file_name="missing_value_report.csv",
         mime="text/csv",
     )
+
     # ════════════════════════════════════════════════════════════════
     # SECTION 2 — DUPLICATE DETECTOR
     # ════════════════════════════════════════════════════════════════
@@ -296,7 +385,8 @@ def show():
                 mime="text/csv",
                 key="dl_dedup"
             )
-            # ════════════════════════════════════════════════════════════════
+
+    # ════════════════════════════════════════════════════════════════
     # SECTION 3 — DATA TYPE FIXER
     # ════════════════════════════════════════════════════════════════
     st.markdown("---")
@@ -400,6 +490,7 @@ def show():
         mime="text/csv",
         key="dl_typefixed"
     )
+
     # ════════════════════════════════════════════════════════════════
     # SECTION 4 — AUTO CLEANER
     # ════════════════════════════════════════════════════════════════

@@ -3,6 +3,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import warnings
 from scipy import stats
 import plotly.graph_objects as go
 from config.settings import (
@@ -78,6 +79,8 @@ def _metric_card(col, value, label):
 
 
 def _verdict_badge(p_value, alpha=0.05):
+    if pd.isna(p_value):
+        return '<span class="verdict-nosig">⚪ Result Undetermined (NaN)</span>'
     if p_value < alpha:
         return (
             f'<span class="verdict-sig">✅ Statistically Significant '
@@ -94,18 +97,6 @@ def _save_stat_result(test_type, variables, statistic_name, statistic_value,
                        p_value, interpretation, alpha=0.05):
     """
     Appends one hypothesis-test result to st.session_state["stats_results"].
-    Schema (one dict per test run):
-      {
-        "test_type": str          e.g. "T-Test (Two-Sample)"
-        "variables": str          e.g. "Sales by Region (North vs South)"
-        "statistic_name": str     e.g. "T-Statistic"
-        "statistic_value": float
-        "p_value": float
-        "significant": bool       p_value < alpha
-        "interpretation": str     plain-language verdict sentence
-      }
-    Report Generator reads st.session_state.get("stats_results", []) to
-    build the Statistical Findings section of the .docx report.
     """
     if "stats_results" not in st.session_state:
         st.session_state["stats_results"] = []
@@ -114,9 +105,9 @@ def _save_stat_result(test_type, variables, statistic_name, statistic_value,
         "test_type": test_type,
         "variables": variables,
         "statistic_name": statistic_name,
-        "statistic_value": round(float(statistic_value), 4),
-        "p_value": round(float(p_value), 4),
-        "significant": bool(p_value < alpha),
+        "statistic_value": round(float(statistic_value), 4) if not pd.isna(statistic_value) else "NaN",
+        "p_value": round(float(p_value), 4) if not pd.isna(p_value) else "NaN",
+        "significant": bool(p_value < alpha) if not pd.isna(p_value) else False,
         "interpretation": interpretation
     })
 
@@ -208,20 +199,29 @@ def _t_test(df, num_cols, cat_cols):
             return
 
         if st.button("🧪 Run T-Test", key="run_tt2"):
-            t_stat, p_val = stats.ttest_ind(data_a, data_b, equal_var=False)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                t_stat, p_val = stats.ttest_ind(data_a, data_b, equal_var=False)
 
             st.divider()
             m1, m2, m3, m4 = st.columns(4)
             _metric_card(m1, f"{data_a.mean():.3f}", f"Mean — {group_a}")
             _metric_card(m2, f"{data_b.mean():.3f}", f"Mean — {group_b}")
-            _metric_card(m3, f"{t_stat:.3f}",        "T-Statistic")
-            _metric_card(m4, f"{p_val:.4f}",         "P-Value")
+            
+            # Format nicely even if NaN
+            t_str = f"{t_stat:.3f}" if not pd.isna(t_stat) else "NaN"
+            p_str = f"{p_val:.4f}" if not pd.isna(p_val) else "NaN"
+            _metric_card(m3, t_str, "T-Statistic")
+            _metric_card(m4, p_str, "P-Value")
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(_verdict_badge(p_val), unsafe_allow_html=True)
 
             st.markdown("### 💬 Interpretation")
-            if p_val < 0.05:
+            if pd.isna(p_val):
+                interp = "Could not compute T-Test (likely zero variance in groups)."
+                st.warning(interp)
+            elif p_val < 0.05:
                 interp = (
                     f"There IS a statistically significant difference in "
                     f"{value_col} between {group_a} "
@@ -272,19 +272,27 @@ def _t_test(df, num_cols, cat_cols):
         data = df[value_col].dropna()
 
         if st.button("🧪 Run One-Sample T-Test", key="run_tt1"):
-            t_stat, p_val = stats.ttest_1samp(data, test_value)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                t_stat, p_val = stats.ttest_1samp(data, test_value)
 
             st.divider()
             m1, m2, m3 = st.columns(3)
             _metric_card(m1, f"{data.mean():.3f}", "Sample Mean")
-            _metric_card(m2, f"{t_stat:.3f}",      "T-Statistic")
-            _metric_card(m3, f"{p_val:.4f}",       "P-Value")
+            
+            t_str = f"{t_stat:.3f}" if not pd.isna(t_stat) else "NaN"
+            p_str = f"{p_val:.4f}" if not pd.isna(p_val) else "NaN"
+            _metric_card(m2, t_str, "T-Statistic")
+            _metric_card(m3, p_str, "P-Value")
 
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(_verdict_badge(p_val), unsafe_allow_html=True)
 
             st.markdown("### 💬 Interpretation")
-            if p_val < 0.05:
+            if pd.isna(p_val):
+                interp = "Could not compute test (likely zero variance in data)."
+                st.warning(interp)
+            elif p_val < 0.05:
                 interp = (
                     f"The mean of {value_col} ({data.mean():.2f}) is "
                     f"significantly different from {test_value} (p={p_val:.4f})."
@@ -331,7 +339,9 @@ def _chi_square(df, cat_cols):
             st.error("Need at least 2 categories in each variable.")
             return
 
-        chi2, p_val, dof, expected = stats.chi2_contingency(contingency)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            chi2, p_val, dof, expected = stats.chi2_contingency(contingency)
 
         st.divider()
         m1, m2, m3 = st.columns(3)
@@ -423,19 +433,28 @@ def _anova(df, num_cols, cat_cols):
         return
 
     if st.button("📈 Run ANOVA", key="run_anova"):
-        f_stat, p_val = stats.f_oneway(*group_data)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            f_stat, p_val = stats.f_oneway(*group_data)
 
         st.divider()
         m1, m2, m3 = st.columns(3)
-        _metric_card(m1, f"{f_stat:.3f}", "F-Statistic")
+        
+        f_str = f"{f_stat:.3f}" if not pd.isna(f_stat) else "NaN"
+        p_str = f"{p_val:.4f}" if not pd.isna(p_val) else "NaN"
+        
+        _metric_card(m1, f_str, "F-Statistic")
         _metric_card(m2, f"{len(groups)}", "Groups Compared")
-        _metric_card(m3, f"{p_val:.4f}",  "P-Value")
+        _metric_card(m3, p_str,  "P-Value")
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(_verdict_badge(p_val), unsafe_allow_html=True)
 
         st.markdown("### 💬 Interpretation")
-        if p_val < 0.05:
+        if pd.isna(p_val):
+            interp = "Could not compute ANOVA (likely zero variance in groups)."
+            st.warning(interp)
+        elif p_val < 0.05:
             interp = (
                 f"There IS a statistically significant difference in "
                 f"{value_col} across the {group_col} groups "
@@ -504,6 +523,10 @@ def _normality_test(df, num_cols):
     if len(data) < 3:
         st.error("Need at least 3 data points.")
         return
+        
+    if data.nunique() <= 1:
+        st.error(f"Cannot test normality on '{value_col}': Data has zero variance (all values are identical).")
+        return
 
     if len(data) > 5000:
         st.warning(
@@ -513,20 +536,32 @@ def _normality_test(df, num_cols):
         data = data.sample(5000, random_state=42)
 
     if st.button("🔔 Run Normality Test", key="run_norm"):
-        shapiro_stat, shapiro_p = stats.shapiro(data)
-        skewness = data.skew()
-        kurtosis = data.kurt()
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            warnings.simplefilter("ignore", category=UserWarning)
+            shapiro_stat, shapiro_p = stats.shapiro(data)
+            skewness = data.skew()
+            kurtosis = data.kurt()
 
         st.divider()
         m1, m2, m3, m4 = st.columns(4)
-        _metric_card(m1, f"{shapiro_stat:.4f}", "Shapiro-Wilk Statistic")
-        _metric_card(m2, f"{shapiro_p:.4f}",    "P-Value")
+        
+        sh_stat_str = f"{shapiro_stat:.4f}" if not pd.isna(shapiro_stat) else "NaN"
+        sh_p_str    = f"{shapiro_p:.4f}" if not pd.isna(shapiro_p) else "NaN"
+        
+        _metric_card(m1, sh_stat_str, "Shapiro-Wilk Statistic")
+        _metric_card(m2, sh_p_str,    "P-Value")
         _metric_card(m3, f"{skewness:.3f}",     "Skewness")
         _metric_card(m4, f"{kurtosis:.3f}",     "Kurtosis")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        if shapiro_p < 0.05:
+        if pd.isna(shapiro_p):
+             st.markdown(
+                '<span class="verdict-nosig">⚪ Result Undetermined (NaN)</span>',
+                unsafe_allow_html=True
+            )
+        elif shapiro_p < 0.05:
             st.markdown(
                 '<span class="verdict-nosig">⚠️ NOT Normally Distributed '
                 f'(p={shapiro_p:.4f} &lt; 0.05)</span>',
@@ -540,7 +575,10 @@ def _normality_test(df, num_cols):
             )
 
         st.markdown("### 💬 Interpretation")
-        if shapiro_p < 0.05:
+        if pd.isna(shapiro_p):
+            interp = "Could not compute normality (likely zero variance in data)."
+            st.warning(interp)
+        elif shapiro_p < 0.05:
             interp = (
                 f"{value_col} does NOT follow a normal distribution "
                 f"(p={shapiro_p:.4f}). Consider using non-parametric tests "
@@ -576,7 +614,10 @@ def _normality_test(df, num_cols):
         st.markdown("### 📊 Histogram vs Normal Curve")
         mean, std = data.mean(), data.std()
         x_range = np.linspace(data.min(), data.max(), 200)
-        normal_curve = stats.norm.pdf(x_range, mean, std)
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            normal_curve = stats.norm.pdf(x_range, mean, std)
 
         fig_hist = go.Figure()
         fig_hist.add_trace(go.Histogram(
@@ -607,8 +648,11 @@ def _normality_test(df, num_cols):
             "distribution. Deviation from the line indicates non-normality."
         )
 
-        osm, osr = stats.probplot(data, dist="norm", fit=False)
-        slope, intercept, r = stats.linregress(osm, osr)[:3]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            osm, osr = stats.probplot(data, dist="norm", fit=False)
+            slope, intercept, r = stats.linregress(osm, osr)[:3]
+            
         line_x = np.array([osm.min(), osm.max()])
         line_y = slope * line_x + intercept
 

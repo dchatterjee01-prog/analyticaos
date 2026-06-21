@@ -25,7 +25,6 @@ STATUS_BADGE = {
     "error":   ("❌ Error",   "#FF5C5C"),
 }
 
-
 def _inject_css():
     st.markdown(f"""
     <style>
@@ -130,6 +129,37 @@ def _render_agent_tab(agent_name: str, result):
         if "missing_summary" in artifacts and not artifacts["missing_summary"].empty:
             st.markdown("**Missing Value Summary**")
             st.dataframe(artifacts["missing_summary"], width="stretch")
+
+        # --- Stage A / Step Group 1 / Step 3: Drift & Trust display ---
+        drift = artifacts.get("drift", {})
+        trust = artifacts.get("trust", {})
+
+        if drift.get("drift_available") or trust.get("trust_available"):
+            st.markdown("**Drift & Trust Analysis**")
+            dcol1, dcol2, dcol3 = st.columns(3)
+
+            with dcol1:
+                if drift.get("drift_available"):
+                    st.metric(
+                        "Drifted Columns",
+                        f"{drift.get('n_drifted_columns', 0)}/{drift.get('n_columns_checked', 0)}",
+                    )
+            with dcol2:
+                if drift.get("drift_available") and drift.get("drift_share") is not None:
+                    st.metric("Drift Share", f"{drift['drift_share']*100:.1f}%")
+            with dcol3:
+                if trust.get("trust_available") and trust.get("trust_pass_rate") is not None:
+                    st.metric("Trust Pass Rate", f"{trust['trust_pass_rate']*100:.1f}%")
+
+            if drift.get("drift_available") and drift.get("drifted_columns"):
+                drift_df = pd.DataFrame({"Drifted Column": drift["drifted_columns"]})
+                st.dataframe(drift_df, width="stretch", hide_index=True)
+        elif not st.session_state.get("_evidently_hint_shown_this_run", False):
+            st.caption(
+                "💡 Upload a reference dataset on the Cleaning page to enable "
+                "drift detection and trust scoring."
+            )
+            st.session_state["_evidently_hint_shown_this_run"] = True
 
     if agent_name == "InsightAgent":
         if "descriptive_stats" in artifacts:

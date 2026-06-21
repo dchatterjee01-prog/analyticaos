@@ -1,33 +1,44 @@
-# Core app framework
-streamlit>=1.42.0      # floor required for st.login()/st.user OIDC support; tested on 1.58.0
+--extra-index-url https://download.pytorch.org/whl/cpu
 
-# Data processing
-pandas>=3.0.0           # codebase explicitly patched for pandas 3.0 compat (is_numeric_dtype,
-                         # format="mixed", resolution-agnostic datetime checks, no inplace
-                         # fillna on column slices) — do not let this float back below 3.0
-numpy>=2.0.0             # numpy 2.x has real breaking changes from 1.x; tested on 2.4.6
+# Core & Data
+streamlit>=1.42.0
+pandas>=3.0.0
+numpy>=2.0.0
+polars-lts-cpu
 
-# File I/O
+# File I/O & Auth
 openpyxl>=3.1.0
 xlsxwriter>=3.2.0
-
-# Visualization
-plotly>=6.0.0
-kaleido>=1.0.0           # v1.x architecture change: requires a system Chrome/Chromium binary
-                         # (see packages.txt — installs "chromium" on Streamlit Community Cloud).
-                         # Used by pages/viz.py's static PNG export (fig.to_image()).
-
-# Statistics & ML
-scipy>=1.17.0
-scikit-learn>=1.9.0
-statsmodels>=0.14.0
-joblib>=1.4.0
-
-# LLM integration (pages/nlpqa.py)
-google-genai>=2.9.0
-
-# Document generation (Phase 11 Report Generator — pages/report_builder.py)
 python-docx>=1.2.0
-
-# Authentication (Phase 12 — st.login() OIDC, confirmed Step 1)
 authlib>=1.3.0
+mysql-connector-python
+
+# Viz & Reporting
+plotly>=5.10.0,<6.0.0
+kaleido>=1.0.0
+evidently==0.7.21
+shap==0.52.0
+
+# Math, Stats, & Causal
+scipy>=1.17.0
+statsmodels>=0.14.0
+networkx
+dowhy
+
+# ML & Deep Learning (CPU Restricted)
+scikit-learn>=1.9.0
+joblib>=1.4.0
+xgboost
+lightgbm
+catboost
+autogluon.tabular
+torch
+torchvision
+torchaudio
+
+# Agents & LLMs
+google-genai>=2.9.0
+langchain
+langchain-google-genai
+langchain-experimental
+tabulate

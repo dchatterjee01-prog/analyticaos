@@ -10,6 +10,7 @@ Produces plain-language insight bullets from:
 """
 import pandas as pd
 import numpy as np
+import warnings
 from scipy import stats as sp_stats
 from agents.base_agent import BaseAgent, AgentResult
 
@@ -47,9 +48,16 @@ class InsightAgent(BaseAgent):
         skewed_cols = []
         for col in num_cols:
             series = df[col].dropna()
-            if len(series) < 4:
+            if len(series) < 4 or series.nunique() <= 1:
                 continue
-            skew = series.skew()
+            
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                skew = series.skew()
+            
+            if pd.isna(skew):
+                continue
+
             if abs(skew) >= self.SKEW_THRESH:
                 direction = "right" if skew > 0 else "left"
                 skewed_cols.append(col)
@@ -70,7 +78,10 @@ class InsightAgent(BaseAgent):
         strong_pairs  = []
         moderate_pairs = []
         if len(num_cols) >= 2:
-            corr_matrix = df[num_cols].corr()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                corr_matrix = df[num_cols].corr()
+                
             artifacts["correlation_matrix"] = corr_matrix
             seen = set()
             for i, c1 in enumerate(num_cols):
@@ -107,18 +118,25 @@ class InsightAgent(BaseAgent):
         for col in num_cols:
             series = df[col].dropna()
             n = len(series)
-            if n < 4:
+            
+            # Skip if not enough data or zero variance (all identical values)
+            if n < 4 or series.nunique() <= 1:
                 continue
-            if n <= self.SHAPIRO_MAX_N:
-                _, p = sp_stats.shapiro(series.sample(min(n, 5000), random_state=42))
-                is_normal = p >= 0.05
-                method = "Shapiro-Wilk"
-            else:
-                # heuristic: |skew| < 0.5 and |kurt| < 1
-                skew  = series.skew()
-                kurt  = series.kurt()
-                is_normal = abs(skew) < 0.5 and abs(kurt) < 1
-                method = "skew/kurtosis heuristic"
+                
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                warnings.simplefilter("ignore", category=UserWarning) # Ignores Shapiro warnings
+                
+                if n <= self.SHAPIRO_MAX_N:
+                    _, p = sp_stats.shapiro(series.sample(min(n, 5000), random_state=42))
+                    is_normal = p >= 0.05
+                    method = "Shapiro-Wilk"
+                else:
+                    # heuristic: |skew| < 0.5 and |kurt| < 1
+                    skew  = series.skew()
+                    kurt  = series.kurt()
+                    is_normal = abs(skew) < 0.5 and abs(kurt) < 1
+                    method = "skew/kurtosis heuristic"
 
             if not is_normal:
                 non_normal.append(col)
