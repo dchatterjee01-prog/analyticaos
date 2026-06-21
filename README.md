@@ -1,77 +1,57 @@
-# AnalyticaOS
+# AnalyticaOS 🧠
 
-**Autonomous AI Data Scientist & Executive Strategy Consultant**
+**Autonomous AI Data Scientist & Executive Strategy Consultant** Built by **[Daipayan Chatterjee](https://github.com/dchatterjee01-prog)**
 
-Built by **Daipayan Chatterjee**
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://analyticaos-daipayan.streamlit.app/)
 
-AnalyticaOS turns any dataset into boardroom-ready intelligence. Upload a CSV or Excel file and let the system clean it, explore it, test hypotheses, train machine learning models, detect anomalies, forecast trends, and synthesize everything into an executive briefing — plus a downloadable Word report — without writing a line of code.
+AnalyticaOS turns any dataset into boardroom-ready intelligence. Upload a CSV or Excel file and let the system clean it, explore it, test hypotheses, train machine learning models, build neural networks, detect anomalies, forecast trends, and synthesize everything into an executive briefing — plus a downloadable Word report — without writing a single line of code.
 
 ---
 
-## What it does
+## 🚀 Live Demo
+**Try it here:** [AnalyticaOS on Streamlit Community Cloud](https://analyticaos-daipayan.streamlit.app/)
+
+---
+
+## ⚙️ What it does
 
 | Module | Capability |
 |---|---|
-| 🧹 Data Cleaning | Missing value analysis, duplicate detection, type fixing, auto-cleaning |
-| 🔬 EDA | Statistical summaries, correlation analysis, outlier detection, time series |
-| 📊 Pivot Tables | Pivot builder, Top N analysis, time intelligence, Pareto charts |
-| 📈 Visualizations | Chart builder, dashboards, cross-tab and geo views |
-| 📐 Statistical Engine | T-Test, Chi-Square, ANOVA, normality testing with plain-language interpretation |
-| 🤖 Machine Learning | Auto problem-type detection, training, evaluation, exportable models |
-| 🧠 Auto Questions | Autonomous question generation and analysis roadmap from a dataset profile |
-| 🤖 Multi-Agent System | An orchestrated pipeline of AI agents (data quality, insight, modeling) that audits a dataset and produces findings + recommendations |
-| 🔮 Forecasting | Holt-Winters exponential smoothing time series forecasts |
-| 🚨 Anomaly Detection | Isolation Forest + PCA-based outlier detection |
-| 💬 Ask Your Data | Natural-language Q&A over your dataset, powered by Gemini 2.5 Flash (schema-only context, sandboxed execution — your raw data is never sent to the LLM) |
-| 🏛️ Executive Console | A synthesized strategic briefing with a Corporate Health Index and prioritized action matrix |
-| 📄 Report Generator | One-click Word (.docx) report combining every section above |
+| 🧹 **Data Cleaning** | Missing value analysis, duplicate detection, type fixing, auto-cleaning |
+| 🔬 **EDA** | Statistical summaries, correlation analysis, outlier detection, time series |
+| 📊 **Pivot Tables** | Pivot builder, Top N analysis, time intelligence, Pareto charts |
+| 📈 **Visualizations** | Chart builder, dashboards, cross-tab and geo views |
+| 📐 **Statistical Engine** | T-Test, Chi-Square, ANOVA, normality testing with plain-language interpretation |
+| 🤖 **Machine Learning** | Auto problem-type detection, training, evaluation, exportable models |
+| 🧬 **AutoML Engine** | TabularPredictor automated leaderboards via AutoGluon |
+| ⚡ **Deep Learning** | Custom PyTorch Feedforward Neural Networks (Classification & Regression) |
+| 🔮 **Forecasting** | Holt-Winters exponential smoothing and ARIMA/SARIMA models |
+| 🚨 **Anomaly Detection** | Isolation Forest + PCA-based outlier detection |
+| 🔗 **Causal Inference** | DoWhy treatment effect estimation and confounder handling |
+| 💬 **Ask Your Data** | Autonomous LangChain + Gemini Data Analyst Agent that writes and executes Pandas code locally |
+| 🏛️ **Executive Console** | AI-generated strategic narratives, SWOT analysis, and KPI breakdowns |
+| 📄 **Report Generator** | Automated generation of .docx files containing all charts, findings, and analysis |
 
-## Tech stack
+---
 
-- **Frontend/App framework:** Streamlit
-- **Data processing:** pandas, NumPy
-- **Statistics:** SciPy, statsmodels
-- **Machine learning:** scikit-learn
-- **Visualization:** Plotly
-- **Document generation:** python-docx
-- **LLM integration:** Google Gemini 2.5 Flash (`google-genai`)
+## 🛠️ Tech Stack
+
+- **Frontend / Framework:** Streamlit
+- **Data processing:** Pandas 3.0, NumPy, Polars
+- **Statistics & Math:** SciPy, statsmodels, networkx
+- **Machine Learning:** scikit-learn, XGBoost, LightGBM, CatBoost, AutoGluon
+- **Deep Learning:** PyTorch (CPU-optimized)
+- **Causal Inference:** DoWhy
+- **Visualization:** Plotly, Kaleido
+- **LLMs & Agents:** LangChain, Google Gemini 2.5 Flash (`google-genai`)
+- **Document generation:** `python-docx`
 - **Language:** Python 3.12
 
-## Running it locally
+---
 
+## 💻 Running it locally
+
+1. Clone the repository:
 ```bash
-git clone https://github.com/dchatterjee01-prog/analyticaos.git
+git clone [https://github.com/dchatterjee01-prog/analyticaos.git](https://github.com/dchatterjee01-prog/analyticaos.git)
 cd analyticaos
-conda create -n analyticaos python=3.12
-conda activate analyticaos
-pip install -r requirements.txt
-```
-
-Create `.streamlit/secrets.toml` (this file is gitignored — never commit it) with:
-```toml
-GEMINI_API_KEY = "your-key-here"
-```
-
-Then run:
-```bash
-streamlit run app.py
-```
-
-## Deployment
-
-This app is designed to run on **Streamlit Community Cloud**. Secrets (API keys, auth credentials) are configured via the Community Cloud dashboard's secrets manager, not committed to the repository.
-
-## Architecture notes
-
-- Every analysis phase persists its results in `st.session_state`, so later phases (e.g. the Executive Console, Report Generator) can reuse earlier findings without recomputation.
-- The Multi-Agent System (`agents/` package) is decoupled from the Streamlit UI layer — agents are pure Python with no Streamlit imports, so they're independently testable.
-- The `pages/` directory follows one-module-per-feature, each exposing a `show()` entry point called by the central router in `app.py`.
-
-## License
-
-See [LICENSE](LICENSE).
-
-## Author
-
-**Daipayan Chatterjee**
-GitHub: [@dchatterjee01-prog](https://github.com/dchatterjee01-prog)
