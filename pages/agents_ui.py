@@ -2,10 +2,14 @@
 agents_ui.py — Phase 9: Multi-Agent System UI
 Lets the user run the full agent pipeline (DataQuality -> Insight -> Modeling)
 with one click and view results in the existing dark-theme card style.
+
+Stage E / Step 4: now backed by the LangGraph-compiled pipeline via
+agents.graph_runtime.run_graph_pipeline, instead of agents.Orchestrator.
+Return shape is identical, so no rendering logic below changed.
 """
 import streamlit as st
 import pandas as pd
-from agents import Orchestrator
+from agents.graph_runtime import run_graph_pipeline
 
 PRIMARY_COLOR    = "#6C63FF"
 BACKGROUND_COLOR = "#0F0F1A"
@@ -211,7 +215,7 @@ def show():
             context["target_col"] = target_col
 
         with st.spinner("Agents working..."):
-            report = Orchestrator().run(df, context=context)
+            report = run_graph_pipeline(df, context=context)
 
         st.session_state["agent_report"] = report
 

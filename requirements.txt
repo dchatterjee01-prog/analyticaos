@@ -2,7 +2,7 @@
 
 # Core & Data
 streamlit>=1.42.0
-pandas>=3.0.0
+pandas>=2.0.0,<2.4.0
 numpy>=2.0.0
 polars-lts-cpu
 
@@ -26,7 +26,7 @@ networkx
 dowhy
 
 # ML & Deep Learning (CPU Restricted)
-scikit-learn>=1.9.0
+scikit-learn>=1.4.0,<1.8.0
 joblib>=1.4.0
 xgboost
 lightgbm
@@ -42,3 +42,14 @@ langchain
 langchain-google-genai
 langchain-experimental
 tabulate
+
+pulp
+
+langgraph
+langchain-core
+typing_extensions
+fastai
+
+sqlalchemy
+mysql-connector-python
+pandas

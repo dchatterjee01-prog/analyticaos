@@ -62,7 +62,19 @@ def show():
                 st.stop()
 
             full_data = df[selected_features + [target_col]].dropna(subset=[target_col])
-            stratify_col = full_data[target_col] if problem_type != "regression" else None
+            
+            # --- START OF FIX: Determine if we can safely stratify ---
+            if problem_type != "regression":
+                class_counts = full_data[target_col].value_counts()
+                if class_counts.min() >= 2:
+                    stratify_col = full_data[target_col]
+                else:
+                    stratify_col = None
+                    st.warning("⚠️ **Stratified split disabled:** At least one class in your target column has only 1 instance. Falling back to a random split.")
+            else:
+                stratify_col = None
+            # --- END OF FIX ---
+
             train_data, test_data = train_test_split(
                 full_data, test_size=holdout_pct / 100, random_state=42, stratify=stratify_col
             )

@@ -21,6 +21,20 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# ── Generated outputs (user data, not source code) ─────────────────
+# ── AutoML artifacts (Stage C, Step Group 2) ────────────────────────
+automl_models/
+AutogluonModels/
+*.pkl
+*.ckpt
+
+# ── DB / connection configs (Stage B, SQL Agent) ────────────────────
+connections/
+
+# ── Stray library artifacts ─────────────────────────────────────────
+5.10.0
+
+# ── Generated outputs (user data, not source code) ──────────────────
 /uploads/
 *.docx
+
+data/query_store.db

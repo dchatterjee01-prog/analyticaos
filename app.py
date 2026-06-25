@@ -24,6 +24,7 @@ from pages import automl
 from pages import experiments
 from pages import causal
 from pages import deep_learning
+from pages import optimization
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title=APP_NAME,
@@ -289,10 +290,11 @@ NAV = {
     "🤖 Multi-Agent System": ("agents_ui", "df"),
     "🔮 Forecasting":        ("forecast",  "df"),
     "🚨 Anomaly Detection":  ("anomaly",   "df"),
-    "— STRATEGY —": None,
+    "— DECISION INTELLIGENCE —": None,
     "💬 Ask Your Data":      ("nlpqa",     "df"),
     "🏛️ Executive Console":  ("executive", "df"),
     "📄 Report Generator":   ("report",    "df"),
+    "🧮 Optimization Engine": ("optimization", None),
 }
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -395,10 +397,11 @@ if page == "🏠 Home":
       <div class="hero-byline">Built by Daipayan Chatterjee</div>
       <div class="hero-sub">
         AnalyticaOS turns any dataset into boardroom-ready intelligence.
-        Clean your data, explore it, test hypotheses, train machine learning
-        models, and let a team of autonomous AI agents synthesize the findings
-        into an executive briefing and a downloadable report — all without
-        writing a line of code.
+        Clean your data, explore it, test hypotheses, and train machine
+        learning models — then move beyond description into action: optimize
+        resource allocation, surface the levers that move your key metrics,
+        and let autonomous AI agents synthesize it all into an executive
+        briefing and a downloadable report.
       </div>
     </div>
     <div class="feature-grid">
@@ -411,16 +414,20 @@ if page == "🏠 Home":
         <div class="feature-label">Exploratory Analysis</div>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">📊</div>
-        <div class="feature-label">Pivot Tables</div>
-      </div>
-      <div class="feature-card">
         <div class="feature-icon">🤖</div>
         <div class="feature-label">Machine Learning</div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🔮</div>
         <div class="feature-label">Forecasting</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧮</div>
+        <div class="feature-label">Optimization</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-label">Prescriptive Levers</div>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🏛️</div>
@@ -516,6 +523,10 @@ elif page == "🤖 Multi-Agent System":
         needs_data()
     else:
         agents_ui.show()
+
+elif page == "🧮 Optimization Engine":
+    optimization.show()
+
 
 # ── ROUTING FOR EXECUTIVE CONSOLE (PHASE 10) ─────────────────────────────────
 elif page == "🏛️ Executive Console":
