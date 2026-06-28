@@ -40,7 +40,10 @@ st.set_page_config(
 # ── Authentication gate (Phase 12, Step 7) ────────────────────────────────────
 # Falls back to "no login required" if secrets.toml has no [auth] section,
 # so local development without OIDC configured never crashes.
-AUTH_ENABLED = "auth" in st.secrets
+try:
+    AUTH_ENABLED = "auth" in st.secrets
+except Exception:
+    AUTH_ENABLED = False
 
 if AUTH_ENABLED and not st.user.is_logged_in:
     login_logo_svg = (
