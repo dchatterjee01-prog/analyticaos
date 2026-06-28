@@ -1,10 +1,11 @@
 """
-Stage H + I + J — Window Functions Builder + CTE Builder + Saved Queries.
-Three tabs: Window Functions · CTE Builder · Saved Queries.
+Stage H + I + J + K — SQL Builders + Saved Queries + SQL Analytics Agent.
+Four tabs: Window Functions · CTE Builder · Saved Queries · DB Analytics.
 Requires an active DB connection from pages/sql_connect.py.
 """
-
+import pandas as pd
 import streamlit as st
+from connections.bridge import apply_bridge
 from connections.db_engine import (
     get_engine,
     get_conn_meta,
@@ -30,11 +31,12 @@ from connections.query_store import (
     delete_query,
     export_queries_sql,
 )
+from agents.sql_analytics_agent import SQLAnalyticsAgent
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="SQL Builders", page_icon="🪟", layout="wide")
 st.title("🪟 SQL Builders")
-st.caption("Window Functions · CTE Builder · Saved Queries")
+st.caption("Window Functions · CTE Builder · Saved Queries · DB Analytics")
 
 # ── Guard: must be connected ──────────────────────────────────────────────────
 if not get_engine():
@@ -51,23 +53,24 @@ st.info(
 )
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_wf, tab_cte, tab_saved = st.tabs([
+tab_wf, tab_cte, tab_saved, tab_agent = st.tabs([
     "🪟 Window Functions",
     "🔗 CTE Builder",
     "💾 Saved Queries",
+    "🤖 DB Analytics",
 ])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# HELPER — inline save form (reused in both WF and CTE tabs)
+# HELPER — inline save form
 # ══════════════════════════════════════════════════════════════════════════════
 def _render_save_form(sql: str, source_page: str, key_prefix: str) -> None:
-    """Render a compact Save Query form beneath any SQL editor."""
     with st.expander("💾 Save this query", expanded=False):
         col_n, col_d = st.columns([2, 3])
         qname = col_n.text_input("Query name", key=f"{key_prefix}_save_name")
-        qdesc = col_d.text_input("Description (optional)",
-                                 key=f"{key_prefix}_save_desc")
+        qdesc = col_d.text_input(
+            "Description (optional)", key=f"{key_prefix}_save_desc"
+        )
         if st.button("Save", key=f"{key_prefix}_save_btn"):
             if not qname.strip():
                 st.error("Query name is required.")
@@ -139,8 +142,8 @@ with tab_wf:
 
     st.divider()
     st.markdown("**⑤ ORDER BY**")
-    order_col  = st.selectbox("Order by column", all_cols, key="wf_order_col")
-    order_dir  = st.radio(
+    order_col = st.selectbox("Order by column", all_cols, key="wf_order_col")
+    order_dir = st.radio(
         "Direction", ["ASC", "DESC"], horizontal=True, key="wf_order_dir"
     )
     order_cols = [(order_col, order_dir)]
@@ -226,16 +229,13 @@ with tab_wf:
         if "wf_result_df" not in st.session_state:
             st.warning("Run the query first before loading.")
         else:
-            st.session_state["df"] = st.session_state["wf_result_df"].copy()
+            df_cast, br = apply_bridge(st.session_state["wf_result_df"])
+            st.session_state["df"] = df_cast
             st.session_state["data_source"] = (
                 f"Window Function · {selected_func} · {selected_table}"
             )
             st.success("✅ Data loaded into AnalyticaOS.")
-
-    # Save form
-    _render_save_form(edited_sql, source_page="Window Functions", key_prefix="wf")
-
-
+            st.caption(br.summary)
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — CTE BUILDER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -361,16 +361,14 @@ with tab_cte:
         if "cte_result_df" not in st.session_state:
             st.warning("Run the CTE query first before loading.")
         else:
-            st.session_state["df"] = st.session_state["cte_result_df"].copy()
+            df_cast, br = apply_bridge(st.session_state["cte_result_df"])
+            st.session_state["df"] = df_cast
             st.session_state["data_source"] = "CTE Builder (SQL)"
             st.success("✅ Data loaded into AnalyticaOS.")
-
-    # Save form
-    _render_save_form(cte_edited_sql, source_page="CTE Builder", key_prefix="cte")
-
+            st.caption(br.summary)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — SAVED QUERIES LIBRARY
+# TAB 3 — SAVED QUERIES
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_saved:
     st.subheader("💾 Saved Queries Library")
@@ -391,12 +389,13 @@ with tab_saved:
         )
 
     queries = list_queries()
-
     if not queries:
-        st.info("No saved queries yet. Use the 💾 Save form in the Window or CTE tabs.")
+        st.info(
+            "No saved queries yet. "
+            "Use the 💾 Save form in the Window or CTE tabs."
+        )
     else:
         st.caption(f"{len(queries)} saved query/queries.")
-
         for q in queries:
             with st.expander(
                 f"**{q.name}** · {q.dialect.upper()} · "
@@ -405,20 +404,19 @@ with tab_saved:
             ):
                 if q.description:
                     st.caption(q.description)
-
                 st.code(q.sql, language="sql")
 
                 col_load_q, col_run_q, col_del, _ = st.columns([1, 1, 1, 3])
 
-                # Load into query editor (NL page or connect page)
-                if col_load_q.button("📋 Copy to clipboard hint", key=f"sq_copy_{q.id}"):
-                    st.session_state["sql_last_query"] = q.sql
+                if col_load_q.button(
+                    "📋 Load to query boxes", key=f"sq_copy_{q.id}"
+                ):
+                    st.session_state["sql_last_query"]   = q.sql
                     st.session_state["nl_generated_sql"] = q.sql
                     st.success(
                         "✅ Loaded into SQL Connect and NL-to-SQL query boxes."
                     )
 
-                # Run directly from library
                 if col_run_q.button("▶ Run", key=f"sq_run_{q.id}"):
                     if not get_engine():
                         st.error("No active DB connection.")
@@ -426,8 +424,8 @@ with tab_saved:
                         with st.spinner("Executing…"):
                             try:
                                 df_sq = run_query(q.sql)
-                                st.session_state["sq_result_df"]  = df_sq
-                                st.session_state["sq_active_id"]  = q.id
+                                st.session_state["sq_result_df"] = df_sq
+                                st.session_state["sq_active_id"] = q.id
                                 st.success(
                                     f"✅ {len(df_sq):,} rows × "
                                     f"{len(df_sq.columns)} columns."
@@ -435,13 +433,11 @@ with tab_saved:
                             except Exception as e:
                                 st.error(f"Query error: {e}")
 
-                # Delete
                 if col_del.button("🗑 Delete", key=f"sq_del_{q.id}"):
                     delete_query(q.id)
                     st.success(f"Deleted **{q.name}**.")
                     st.rerun()
 
-                # Show result if this query was just run
                 if (
                     st.session_state.get("sq_active_id") == q.id
                     and "sq_result_df" in st.session_state
@@ -451,11 +447,147 @@ with tab_saved:
                         df_sq_preview.head(500).astype(str),
                         use_container_width=True,
                     )
-                    if st.button(
-                        "📥 Load into AnalyticaOS", key=f"sq_load_{q.id}"
-                    ):
-                        st.session_state["df"] = df_sq_preview.copy()
-                        st.session_state["data_source"] = (
-                            f"Saved Query · {q.name}"
-                        )
+                    if st.button("📥 Load into AnalyticaOS", key=f"sq_load_{q.id}"):
+                        df_cast, br = apply_bridge(df_sq_preview)
+                        st.session_state["df"] = df_cast
+                        st.session_state["data_source"] = f"Saved Query · {q.name}"
                         st.success("✅ Data loaded into AnalyticaOS.")
+                        st.caption(br.summary)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — DB ANALYTICS AGENT
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_agent:
+    st.subheader("🤖 DB Analytics Agent")
+    st.caption(
+        "Full-database scan — row counts, null rates, "
+        "cardinality, top-N values, numeric stats."
+    )
+
+    # Cache result in session_state to avoid re-scanning on every rerun
+    _AGENT_KEY = "sql_agent_result"
+
+    col_scan, col_clear, _ = st.columns([1, 1, 4])
+    run_agent   = col_scan.button("🔍 Run Full Scan",   key="agent_run")
+    clear_agent = col_clear.button("🗑 Clear Results",  key="agent_clear")
+
+    if clear_agent:
+        st.session_state.pop(_AGENT_KEY, None)
+        st.rerun()
+
+    if run_agent:
+        tables_count = len(list_tables())
+        with st.spinner(
+            f"Scanning {tables_count} table(s)… "
+            "this may take a moment on large databases."
+        ):
+            agent  = SQLAnalyticsAgent()
+            result = agent.run()
+            st.session_state[_AGENT_KEY] = result
+
+    # ── Render cached result ──────────────────────────────────────────────────
+    if _AGENT_KEY not in st.session_state:
+        st.info("Click **Run Full Scan** to analyse all tables in the connected database.")
+        st.stop()
+
+    result = st.session_state[_AGENT_KEY]
+
+    # Status banner
+    if result.status == "error":
+        st.error(result.summary)
+        st.stop()
+
+    st.success(result.summary)
+
+    # ── Cross-table summary DataFrame ─────────────────────────────────────────
+    st.divider()
+    st.subheader("📊 Table Summary")
+    summary_df = result.artifacts.get("table_summary")
+    if summary_df is not None and not summary_df.empty:
+        st.dataframe(summary_df.astype(str), use_container_width=True)
+
+    # ── Findings ──────────────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("🔎 Findings")
+
+    findings = result.findings
+    if not findings:
+        st.success("No issues found across all tables.")
+    else:
+        high = [f for f in findings if f["severity"] == "high"]
+        med  = [f for f in findings if f["severity"] == "medium"]
+        low  = [f for f in findings if f["severity"] == "low"]
+
+        col_h, col_m, col_l = st.columns(3)
+        col_h.metric("🔴 High",   len(high))
+        col_m.metric("🟡 Medium", len(med))
+        col_l.metric("🟢 Low",    len(low))
+
+        for severity, items, colour in [
+            ("high",   high, "🔴"),
+            ("medium", med,  "🟡"),
+            ("low",    low,  "🟢"),
+        ]:
+            if items:
+                with st.expander(
+                    f"{colour} {severity.capitalize()} ({len(items)})",
+                    expanded=(severity == "high"),
+                ):
+                    for f in items:
+                        st.markdown(f"- {f['message']}")
+
+    # ── Recommendations ───────────────────────────────────────────────────────
+    if result.recommendations:
+        st.divider()
+        st.subheader("💡 Recommendations")
+        for rec in result.recommendations:
+            st.markdown(f"- {rec}")
+
+    # ── Per-table column profiles ─────────────────────────────────────────────
+    st.divider()
+    st.subheader("🗂️ Per-Table Column Profiles")
+
+    profiles = result.artifacts.get("profiles", [])
+    for profile in profiles:
+        with st.expander(
+            f"**{profile.name}** — "
+            f"{profile.row_count:,} rows · {profile.col_count} columns",
+            expanded=False,
+        ):
+            if profile.warnings:
+                for w in profile.warnings:
+                    st.warning(w)
+                continue
+
+            col_data = []
+            for c in profile.columns:
+                col_data.append({
+                    "column":    c.name,
+                    "type":      c.dtype,
+                    "nulls":     f"{c.null_count:,} ({c.null_rate:.0%})",
+                    "distinct":  f"{c.distinct_count:,} ({c.cardinality:.0%})",
+                    "min":       c.min_val,
+                    "max":       c.max_val,
+                    "mean":      c.mean_val,
+                    "top values": ", ".join(
+                        str(tv.get("value", "")) for tv in c.top_values[:3]
+                    ),
+                })
+
+            if col_data:
+                st.dataframe(
+                    pd.DataFrame(col_data).astype(str),
+                    use_container_width=True,
+                )
+
+    # ── Load summary into AnalyticaOS ─────────────────────────────────────────
+    st.divider()
+    if st.button("📥 Load Table Summary into AnalyticaOS", key="agent_load"):
+        if summary_df is not None and not summary_df.empty:
+            df_cast, br = apply_bridge(summary_df)
+            st.session_state["df"] = df_cast
+            st.session_state["data_source"] = "SQL Analytics Agent — Table Summary"
+            st.success("✅ Table summary loaded into AnalyticaOS.")
+            st.caption(br.summary)
+        else:
+            st.warning("No summary data to load.")

@@ -25,6 +25,10 @@ from pages import experiments
 from pages import causal
 from pages import deep_learning
 from pages import optimization
+# NOTE: SQL pages (Stages F-O) are NOT imported here.
+# They are lazy-loaded inside the routing block only, to prevent
+# module-level st.* calls from firing at app startup.
+
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title=APP_NAME,
@@ -39,18 +43,23 @@ st.set_page_config(
 AUTH_ENABLED = "auth" in st.secrets
 
 if AUTH_ENABLED and not st.user.is_logged_in:
-    login_logo_svg = ('<svg width="48" height="48" viewBox="0 0 40 40">'
+    login_logo_svg = (
+        '<svg width="64" height="64" viewBox="0 0 40 40">'
         '<rect x="7" y="22" width="6" height="12" rx="2" fill="#5C7290"/>'
         '<rect x="17" y="16" width="6" height="18" rx="2" fill="#2A5C8C"/>'
         '<rect x="27" y="10" width="6" height="24" rx="2" fill="#2A5C8C"/>'
         '<circle cx="30" cy="4" r="4" fill="#2E7D5B"/>'
-        '</svg>')
+        '</svg>'
+    )
 
     login_html = (
+        '<div class="login-bg">'
         '<div class="login-card">'
         '<div class="login-accent-bar"></div>'
         '<div class="login-top">'
+        '<div class="login-logo-plate">'
         f'{login_logo_svg}'
+        '</div>'
         f'<div class="login-title">{APP_NAME}</div>'
         '<div class="login-byline">by Daipayan Chatterjee</div>'
         '<div class="login-desc">Your autonomous AI data scientist — clean, analyze, model, and report on any dataset automatically.</div>'
@@ -65,30 +74,98 @@ if AUTH_ENABLED and not st.user.is_logged_in:
         '<div class="login-divider"></div>'
         '<div class="login-cta-label">Sign in to continue</div>'
         '</div>'
+        f'<div class="login-footer">© 2026 {APP_NAME} — Built by Daipayan Chatterjee</div>'
+        '</div>'
     )
 
     login_css = (
         f'<style>'
+
+        # ── Page / background ──────────────────────────────────────────────
         f'.stApp {{ background-color: {BACKGROUND_COLOR}; }}'
         f'[data-testid="stSidebar"] {{ display: none; }}'
-        f'.login-card {{ max-width: 420px; margin: 3rem auto 0 auto; background-color: {SURFACE_COLOR}; border: 1px solid {BORDER_COLOR}; border-radius: 16px; overflow: hidden; text-align: center; }}'
+
+        # Radial gradient wash — very subtle, centred behind card
+        f'.login-bg {{'
+        f'  min-height: 100vh;'
+        f'  display: flex;'
+        f'  flex-direction: column;'
+        f'  align-items: center;'
+        f'  justify-content: center;'
+        f'  background: radial-gradient(ellipse 70% 55% at 50% 42%,'
+        f'    {SURFACE_COLOR} 0%, {BACKGROUND_COLOR} 100%);'
+        f'}}'
+
+        # ── Card ───────────────────────────────────────────────────────────
+        f'.login-card {{'
+        f'  max-width: 430px;'
+        f'  width: 100%;'
+        f'  background-color: {SURFACE_COLOR};'
+        f'  border: 1px solid {BORDER_COLOR};'
+        f'  border-radius: 20px;'          # slightly larger radius than chips
+        f'  overflow: hidden;'
+        f'  text-align: center;'
+        # Tinted, layered box-shadow for depth (PRIMARY_COLOR = #2A5C8C)
+        f'  box-shadow: 0 8px 32px rgba(42,92,140,0.10), 0 2px 8px rgba(42,92,140,0.07);'
+        f'}}'
+
         f'.login-accent-bar {{ height: 4px; background-color: {PRIMARY_COLOR}; }}'
-        f'.login-top {{ padding: 2.2rem 2rem 1.4rem 2rem; }}'
-        f'.login-title {{ font-family: "Georgia", serif; font-weight: 700; font-size: 1.65rem; color: {PRIMARY_COLOR}; margin-top: 0.9rem; }}'
-        f'.login-byline {{ font-size: 0.85rem; color: {TEXT_COLOR}; font-weight: 600; margin-top: 0.3rem; }}'
-        f'.login-desc {{ font-size: 0.78rem; color: {MUTED_COLOR}; margin-top: 0.8rem; line-height: 1.5; }}'
+
+        # ── Logo plate ────────────────────────────────────────────────────
+        f'.login-top {{ padding: 2.4rem 2rem 1.5rem 2rem; }}'
+        f'.login-logo-plate {{'
+        f'  display: inline-flex;'
+        f'  align-items: center;'
+        f'  justify-content: center;'
+        f'  width: 84px; height: 84px;'
+        f'  background: linear-gradient(145deg, {BACKGROUND_COLOR} 0%, #dce8f5 100%);'
+        f'  border-radius: 20px;'
+        f'  border: 1px solid {BORDER_COLOR};'
+        f'  box-shadow: 0 2px 8px rgba(42,92,140,0.08);'
+        f'  margin-bottom: 0.2rem;'
+        f'}}'
+
+        # ── Typography ────────────────────────────────────────────────────
+        f'.login-title {{ font-family: "Georgia", serif; font-weight: 700; font-size: 1.65rem; color: {PRIMARY_COLOR}; margin-top: 1rem; }}'
+        f'.login-byline {{ font-size: 0.85rem; color: {TEXT_COLOR}; font-weight: 600; margin-top: 0.35rem; }}'
+        f'.login-desc {{ font-size: 0.78rem; color: {MUTED_COLOR}; margin-top: 0.9rem; line-height: 1.6; }}'
+
+        # ── Divider ───────────────────────────────────────────────────────
         f'.login-divider {{ height: 1px; background-color: {BORDER_COLOR}; margin: 0 1.6rem; }}'
-        f'.login-features {{ padding: 1.2rem 1.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}'
-        f'.feature-chip {{ background-color: {BACKGROUND_COLOR}; border: 1px solid {BORDER_COLOR}; border-radius: 8px; padding: 0.6rem; }}'
-        f'.feature-chip-icon {{ font-size: 1.1rem; }}'
-        f'.feature-chip-label {{ font-size: 0.66rem; color: {MUTED_COLOR}; margin-top: 2px; }}'
-        f'.login-cta-label {{ font-size: 0.72rem; color: {MUTED_COLOR}; padding: 1.4rem 0 0.4rem 0; }}'
+
+        # ── Feature chips ─────────────────────────────────────────────────
+        f'.login-features {{ padding: 1.3rem 1.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}'
+        f'.feature-chip {{'
+        f'  background-color: {BACKGROUND_COLOR};'
+        f'  border: 1px solid {BORDER_COLOR};'
+        f'  border-radius: 10px;'          # slightly smaller than card's 20px
+        f'  padding: 0.65rem 0.5rem;'
+        f'  transition: transform 0.15s ease, box-shadow 0.15s ease;'
+        f'}}'
+        f'.feature-chip:hover {{'
+        f'  transform: translateY(-2px);'
+        f'  box-shadow: 0 4px 12px rgba(42,92,140,0.10);'
+        f'}}'
+        f'.feature-chip-icon {{ font-size: 1.15rem; }}'
+        f'.feature-chip-label {{ font-size: 0.66rem; color: {MUTED_COLOR}; margin-top: 3px; }}'
+
+        # ── CTA label ─────────────────────────────────────────────────────
+        f'.login-cta-label {{ font-size: 0.72rem; color: {MUTED_COLOR}; padding: 1.5rem 0 1.6rem 0; }}'
+
+        # ── Footer ────────────────────────────────────────────────────────
+        f'.login-footer {{'
+        f'  font-size: 0.65rem;'
+        f'  color: {MUTED_COLOR};'
+        f'  margin-top: 1.1rem;'
+        f'  opacity: 0.7;'
+        f'}}'
+
         f'</style>'
     )
 
     st.markdown(login_css + login_html, unsafe_allow_html=True)
 
-    _, center_col, _ = st.columns([1, 1, 1])
+    _, center_col, _ = st.columns([1.5, 1, 1.5])   # tighter centre column → ~66% width button
     with center_col:
         if st.button("🔵 Log in with Google", width='stretch', type="primary"):
             st.login()
@@ -166,14 +243,33 @@ st.markdown(f"""
     padding: 0.25rem 0.6rem !important;
     width: auto !important;
   }}
-  .nav-group {{
-    font-size: 0.66rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #5C7290;
-    padding: 1.1rem 0.4rem 0.4rem 0.4rem;
-    margin-top: 0.2rem;
+  .nav-group-btn button {{
+    width: 100% !important;
+    text-align: left !important;
+    background-color: #E8EFF7 !important;
+    color: {PRIMARY_COLOR} !important;
+    border: 1px solid {BORDER_COLOR} !important;
+    border-radius: 8px !important;
+    padding: 0.35rem 0.8rem !important;
+    font-size: 0.66rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.10em !important;
+    text-transform: uppercase !important;
+    margin-top: 0.6rem !important;
+    margin-bottom: 0.1rem !important;
+    box-shadow: none !important;
+    transition: background-color 0.12s ease !important;
+  }}
+  .nav-group-btn button:hover {{
+    background-color: #dce8f5 !important;
+    border-color: {PRIMARY_COLOR} !important;
+  }}
+  .nav-group-btn button p {{
+    font-size: 0.66rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.10em !important;
+    text-transform: uppercase !important;
+    text-align: left !important;
   }}
   /* ── Sidebar nav buttons ─────────────────────────────────────────── */
   [data-testid="stSidebar"] .stButton button {{
@@ -269,32 +365,45 @@ st.markdown(f"""
 
 # ── Navigation map ───────────────────────────────────────────────────────────
 NAV = {
-    "🏠 Home": ("home", None),
-    "— DATA —": None,
-    "📁 Upload Data":        ("upload",    None),
-    "🗂️ Multi-Sheet Excel": ("excel_intelligence_ui", None),
-    "🧹 Data Cleaning":      ("cleaning",  "df"),
-    "— ANALYSIS —": None,
-    "🔬 EDA":                ("eda",       "df"),
-    "📊 Pivot Tables":       ("pivot",     "df"),
-    "📈 Visualizations":     ("viz",       "df"),
-    "📐 Statistical Engine": ("stats",     "df"),
-    "🧪 A/B Testing":        ("experiments", "df"),
-    "🔗 Causal Inference":   ("causal",      "df"),
-    "🗄️ SQL Agent": ("sql_agent_ui", None),
-    "— INTELLIGENCE —": None,
-    "🤖 Machine Learning":   ("ml",        "df"),
-    "🧬 AutoML Engine":      ("automl",    "df"),
-    "⚡ Deep Learning":      ("deep_learning", "df"),
-    "🧠 Auto Questions":    ("questions", "df"),
-    "🤖 Multi-Agent System": ("agents_ui", "df"),
-    "🔮 Forecasting":        ("forecast",  "df"),
-    "🚨 Anomaly Detection":  ("anomaly",   "df"),
-    "— DECISION INTELLIGENCE —": None,
-    "💬 Ask Your Data":      ("nlpqa",     "df"),
-    "🏛️ Executive Console":  ("executive", "df"),
-    "📄 Report Generator":   ("report",    "df"),
-    "🧮 Optimization Engine": ("optimization", None),
+    "🏠 Home":                    ("home",                  None),
+    "— DATA —":                   None,
+    "📁 Upload Data":             ("upload",                None),
+    "🗂️ Multi-Sheet Excel":      ("excel_intelligence_ui", None),
+    "🧹 Data Cleaning":           ("cleaning",              "df"),
+    "— SQL ENGINE —":             None,
+    "🔌 SQL Connect":             ("sql_connect",           None),
+    "🧠 NL-to-SQL":               ("sql_nlquery",           None),
+    "🪟 SQL Builders":            ("sql_window",            None),
+    "🔬 SQL Explainer":           ("sql_explainer",         None),
+    "🗺️ Schema Map":             ("sql_schema_map",        None),
+    "🏗️ Visual Query Builder":   ("sql_visual_builder",    None),
+    "🏛️ Warehouse Advisor":      ("sql_warehouse",         None),
+    "🤖 Auto SQL Analytics":      ("sql_auto_analytics",    None),
+    "— ANALYSIS —":               None,
+    "🔬 EDA":                     ("eda",                   "df"),
+    "📊 Pivot Tables":            ("pivot",                 "df"),
+    "📈 Visualizations":          ("viz",                   "df"),
+    "📐 Statistical Engine":      ("stats",                 "df"),
+    "🧪 A/B Testing":             ("experiments",           "df"),
+    "🔗 Causal Inference":        ("causal",                "df"),
+    "🗄️ SQL Agent":              ("sql_agent_ui",          None),
+    "— INTELLIGENCE —":           None,
+    "🤖 Machine Learning":        ("ml",                    "df"),
+    "🧬 AutoML Engine":           ("automl",                "df"),
+    "⚡ Deep Learning":           ("deep_learning",         "df"),
+    "🧠 Auto Questions":          ("questions",             "df"),
+    "🤖 Multi-Agent System":      ("agents_ui",             "df"),
+    "🔮 Forecasting":             ("forecast",              "df"),
+    "🚨 Anomaly Detection":       ("anomaly",               "df"),
+    "— ADVANCED ANALYTICS —":     None,
+    "📊 Dashboard Composer":       ("dashboard",            None),
+    "👥 Cohort Analysis":          ("cohorts",              "df"),
+    "🔽 Funnel Analysis":          ("funnel",               "df"),
+    "— DECISION INTELLIGENCE —":  None,
+    "💬 Ask Your Data":           ("nlpqa",                 "df"),
+    "🏛️ Executive Console":      ("executive",             "df"),
+    "📄 Report Generator":        ("report",                "df"),
+    "🧮 Optimization Engine":     ("optimization",          None),
 }
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -365,24 +474,75 @@ with st.sidebar:
 
     st.markdown("")
 
-    # Initialize current page in session state
     if "current_page" not in st.session_state:
         st.session_state["current_page"] = "🏠 Home"
 
-    # Render nav items in order, with proper grouping and active highlight
+    page = st.session_state["current_page"]
+
+    # ── Build group structure from NAV ───────────────────────────────────
+    groups = []
+    current_group = None
     for key, val in NAV.items():
+        if key == "🏠 Home":
+            continue
         if key.startswith("—"):
-            # Section header
             label = key.strip("— ").strip()
-            st.markdown(f'<div class="nav-group">{label}</div>', unsafe_allow_html=True)
-        else:
-            is_active = (st.session_state["current_page"] == key)
-            wrapper_class = "nav-active" if is_active else "nav-inactive"
-            st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
-            if st.button(key, key=f"navbtn_{key}", width="stretch"):
-                st.session_state["current_page"] = key
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+            slug  = label.lower().replace(" ", "_")
+            current_group = {"label": label, "slug": slug, "items": []}
+            groups.append(current_group)
+        elif current_group is not None:
+            current_group["items"].append(key)
+
+    # ── Find which group contains the active page ────────────────────────
+    def active_group_slug(active_page):
+        for g in groups:
+            if active_page in g["items"]:
+                return g["slug"]
+        return None
+
+    active_slug = active_group_slug(page)
+
+    # ── Seed session_state expand booleans (first run only) ─────────────
+    for g in groups:
+        sk = f"nav_open_{g['slug']}"
+        if sk not in st.session_state:
+            st.session_state[sk] = (g["slug"] == active_slug)
+
+    # ── Always keep the active group open ────────────────────────────────
+    if active_slug:
+        st.session_state[f"nav_open_{active_slug}"] = True
+
+    # ── Home button (outside groups) ─────────────────────────────────────
+    is_home = (page == "🏠 Home")
+    st.markdown('<div class="nav-active">' if is_home else '<div class="nav-inactive">', unsafe_allow_html=True)
+    if st.button("🏠 Home", key="navbtn_home", width="stretch"):
+        st.session_state["current_page"] = "🏠 Home"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Render collapsible groups ─────────────────────────────────────────
+    for g in groups:
+        sk      = f"nav_open_{g['slug']}"
+        is_open = st.session_state[sk]
+        chevron = "▾" if is_open else "▸"
+        count   = len(g["items"])
+        label   = f"{chevron}  {g['label']}  ({count})"
+
+        st.markdown('<div class="nav-group-btn">', unsafe_allow_html=True)
+        if st.button(label, key=f"navgrp_{g['slug']}", width="stretch"):
+            st.session_state[sk] = not is_open
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if is_open:
+            for key in g["items"]:
+                is_active   = (page == key)
+                wrapper_cls = "nav-active" if is_active else "nav-inactive"
+                st.markdown(f'<div class="{wrapper_cls}">', unsafe_allow_html=True)
+                if st.button(key, key=f"navbtn_{key}", width="stretch"):
+                    st.session_state["current_page"] = key
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
     page = st.session_state["current_page"]
 
@@ -433,6 +593,10 @@ if page == "🏠 Home":
         <div class="feature-icon">🏛️</div>
         <div class="feature-label">Executive Strategy</div>
       </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔌</div>
+        <div class="feature-label">SQL Engine</div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -441,7 +605,7 @@ elif page == "📁 Upload Data":
     render()
 
 elif page == "🗂️ Multi-Sheet Excel":
-       excel_intelligence_ui.show()
+    excel_intelligence_ui.show()
 
 # ── ROUTING FOR DATA CLEANING ────────────────────────────────────────────────
 elif page == "🧹 Data Cleaning":
@@ -449,6 +613,39 @@ elif page == "🧹 Data Cleaning":
         needs_data()
     else:
         cleaning.show()
+
+# ── ROUTING FOR SQL ENGINE (Stages F-O) ──────────────────────────────────────
+elif page == "🔌 SQL Connect":
+    from pages.sql_connect import show as sql_connect_show
+    sql_connect_show()
+
+elif page == "🧠 NL-to-SQL":
+    from pages.sql_nlquery import show as sql_nlquery_show
+    sql_nlquery_show()
+
+elif page == "🪟 SQL Builders":
+    from pages.sql_window import show as sql_window_show
+    sql_window_show()
+
+elif page == "🔬 SQL Explainer":
+    from pages.sql_explainer import show as sql_explainer_show
+    sql_explainer_show()
+
+elif page == "🗺️ Schema Map":
+    from pages.sql_schema_map import show as sql_schema_map_show
+    sql_schema_map_show()
+
+elif page == "🏗️ Visual Query Builder":
+    from pages.sql_visual_builder import show as sql_vqb_show
+    sql_vqb_show()
+
+elif page == "🏛️ Warehouse Advisor":
+    from pages.sql_warehouse import show as sql_warehouse_show
+    sql_warehouse_show()
+
+elif page == "🤖 Auto SQL Analytics":
+    from pages.sql_auto_analytics import show as sql_auto_show
+    sql_auto_show()
 
 # ── ROUTING FOR EDA ──────────────────────────────────────────────────────────
 elif page == "🔬 EDA":
@@ -491,7 +688,7 @@ elif page == "🔗 Causal Inference":
         causal.show()
 
 elif page == "🗄️ SQL Agent":
-       sql_agent_ui.show()
+    sql_agent_ui.show()
 
 elif page == "🤖 Machine Learning":
     if "df" not in st.session_state or st.session_state["df"] is None:
@@ -527,7 +724,6 @@ elif page == "🤖 Multi-Agent System":
 elif page == "🧮 Optimization Engine":
     optimization.show()
 
-
 # ── ROUTING FOR EXECUTIVE CONSOLE (PHASE 10) ─────────────────────────────────
 elif page == "🏛️ Executive Console":
     if "df" not in st.session_state or st.session_state["df"] is None:
@@ -542,16 +738,34 @@ elif page == "📄 Report Generator":
         report.show()
 
 elif page == "🔮 Forecasting":
-       if "df" not in st.session_state or st.session_state["df"] is None:
-           needs_data()
-       else:
-           forecast.show()
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        forecast.show()
 
 elif page == "🚨 Anomaly Detection":
-       if "df" not in st.session_state or st.session_state["df"] is None:
-           needs_data()
-       else:
-           anomaly.show()
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        anomaly.show()
+
+elif page == "📊 Dashboard Composer":
+    from pages.dashboard import show as dashboard_show
+    dashboard_show()
+
+elif page == "👥 Cohort Analysis":
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        from pages.cohorts import show as cohorts_show
+        cohorts_show()
+
+elif page == "🔽 Funnel Analysis":
+    if "df" not in st.session_state or st.session_state["df"] is None:
+        needs_data()
+    else:
+        from pages.funnel import show as funnel_show
+        funnel_show()
 
 elif page == "💬 Ask Your Data":
     if "df" not in st.session_state or st.session_state["df"] is None:

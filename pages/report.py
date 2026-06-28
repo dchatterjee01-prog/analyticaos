@@ -1,6 +1,8 @@
 # pages/report.py
 import streamlit as st
+import pandas as pd
 from datetime import datetime
+from google import genai
 from config.settings import (
     PRIMARY_COLOR, BACKGROUND_COLOR, SURFACE_COLOR, TEXT_COLOR,
     BORDER_COLOR, MUTED_COLOR, SUCCESS_COLOR, SUCCESS_BG,
@@ -34,6 +36,11 @@ def _inject_css():
             background-color: {WARNING_BG}; color: {WARNING_COLOR};
             border: 1px solid {WARNING_COLOR}; border-radius: 20px;
             padding: 3px 12px; font-size: 11px; font-weight: 700;
+        }}
+        .narrative-box {{
+            background: {SURFACE_COLOR}; border: 1px solid {BORDER_COLOR};
+            border-left: 4px solid {PRIMARY_COLOR}; border-radius: 8px;
+            padding: 1.5rem; margin-top: 0.5rem; font-size: 1.05rem; line-height: 1.6;
         }}
         </style>
     """, unsafe_allow_html=True)
@@ -73,6 +80,7 @@ def _assess_available_sections():
     aq_profile = st.session_state.get("aq_profile", {})
     aq_roadmap = st.session_state.get("aq_roadmap", [])
     stats_results = st.session_state.get("stats_results", [])
+    report_ai_narrative = st.session_state.get("report_ai_narrative", "")
 
     results = agent_report.get("results", {}) if agent_report else {}
     has_dq = "DataQualityAgent" in results
@@ -81,6 +89,7 @@ def _assess_available_sections():
 
     availability = {
         "executive_summary": bool(agent_report),
+        "ai_narrative": bool(report_ai_narrative),
         "data_quality": has_dq,
         "eda_highlights": has_insight,
         "statistical_findings": bool(stats_results),
@@ -95,7 +104,48 @@ def _assess_available_sections():
         "aq_roadmap": aq_roadmap,
         "stats_results": stats_results,
         "dataset_name": st.session_state.get("filename", "Uploaded Dataset"),
+        "ai_narrative": report_ai_narrative
     }
+
+
+def generate_ai_narrative(df: pd.DataFrame, source_name: str) -> str:
+    """Uses Gemini to write a high-level executive summary of the dataset."""
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        return f"Error configuring Gemini API: {e}"
+
+    stats = df.describe(include='all').to_string()
+    columns = ", ".join(df.columns.tolist())
+    shape = f"{df.shape[0]} rows, {df.shape[1]} columns"
+
+    prompt = f"""
+    You are an expert Data Analyst and Executive Consultant.
+    Write a 3-paragraph executive summary for a report based on the following dataset.
+    
+    Dataset Context: {source_name}
+    Shape: {shape}
+    Columns: {columns}
+    
+    Statistical Summary:
+    {stats}
+    
+    Rules:
+    - Paragraph 1: Overview of the data size and what it represents.
+    - Paragraph 2: Key statistical observations (min, max, mean, top categories).
+    - Paragraph 3: Potential business implications or areas for further investigation.
+    - Do NOT use markdown formatting (no asterisks, no hashes). Return plain text with double line breaks between paragraphs.
+    """
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
+        return response.text.strip()
+    except Exception as e:
+        return f"Error generating narrative: {e}"
 
 
 def show():
@@ -108,7 +158,7 @@ def show():
     )
 
     if "df" not in st.session_state or st.session_state["df"] is None:
-        st.warning("⚠️ No active dataset found. Please upload a dataset first via **📁 Upload Data**.")
+        st.warning("⚠️ No active dataset found. Please upload a dataset first via **📁 Upload Data** or **SQL Connect**.")
         return
 
     agent_report = st.session_state.get("agent_report", {})
@@ -124,6 +174,20 @@ def show():
             "**Run Multi-Agent Analysis** first."
         )
         return
+
+    # ── Stage J: AI Narrative Generator ──
+    st.markdown("### AI Executive Narrative (Stage J)")
+    if "report_ai_narrative" not in st.session_state:
+        st.session_state["report_ai_narrative"] = ""
+
+    if st.button("✨ Generate AI Narrative"):
+        with st.spinner("Analyzing dataset statistics and generating narrative..."):
+            narrative = generate_ai_narrative(st.session_state["df"], st.session_state.get("filename", "Active Dataset"))
+            st.session_state["report_ai_narrative"] = narrative
+            st.rerun()
+
+    if st.session_state["report_ai_narrative"]:
+        st.markdown(f'<div class="narrative-box">{st.session_state["report_ai_narrative"].replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
 
     availability, context = _assess_available_sections()
 
@@ -150,32 +214,37 @@ def show():
         availability["executive_summary"]
     )
     _section_row(
-        "2. Data Quality Audit",
+        "2. AI Data Narrative",
+        "Stage J generated AI dataset narrative overview.",
+        availability["ai_narrative"]
+    )
+    _section_row(
+        "3. Data Quality Audit",
         "Missing values, duplicates, type issues, constant columns (DataQualityAgent).",
         availability["data_quality"]
     )
     _section_row(
-        "3. EDA Highlights",
+        "4. EDA Highlights",
         "Descriptive stats, strong correlations, skewness, high-cardinality flags (InsightAgent).",
         availability["eda_highlights"]
     )
     _section_row(
-        "4. Statistical Findings",
+        "5. Statistical Findings",
         "T-Test, Chi-Square, ANOVA, Normality results run in the Statistical Engine.",
         availability["statistical_findings"]
     )
     _section_row(
-        "5. ML Model Summary",
+        "6. ML Model Summary",
         "Problem type, metrics (R²/Accuracy), top predictive features (ModelingAgent).",
         availability["ml_summary"]
     )
     _section_row(
-        "6. Prioritized Action Matrix",
+        "7. Prioritized Action Matrix",
         "Ranked recommendations with priority tier, timeframe, and domain.",
         availability["action_matrix"]
     )
     _section_row(
-        "7. Appendix — Analysis Roadmap",
+        "8. Appendix — Analysis Roadmap",
         "Full autonomous roadmap generated in the Auto Questions phase.",
         availability["appendix"]
     )
