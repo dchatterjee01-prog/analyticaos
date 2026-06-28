@@ -7,7 +7,7 @@
 **Autonomous AI Data Scientist & Executive Strategy Consultant**  
 Built by **[Daipayan Chatterjee](https://github.com/dchatterjee01-prog)**
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://analyticaos-daipayan.streamlit.app/)
+[![Hugging Face Space](https://img.shields.io/badge/🤗%20Hugging%20Face-Space-blue)](https://huggingface.co/spaces/dchatterjee01/analyticaos-demo)
 
 AnalyticaOS turns any dataset into boardroom-ready intelligence. Upload a CSV or Excel file and let the system clean it, explore it, test hypotheses, train machine learning models, build neural networks, detect anomalies, forecast trends, and synthesize everything into an executive briefing — plus a downloadable Word report — without writing a single line of code.
 
@@ -15,9 +15,9 @@ AnalyticaOS turns any dataset into boardroom-ready intelligence. Upload a CSV or
 
 ## 🚀 Live Demo
 
-**Try it here:** [AnalyticaOS on Streamlit Community Cloud](https://analyticaos-daipayan.streamlit.app/)
+**Try it here:** [AnalyticaOS on Hugging Face Spaces](https://huggingface.co/spaces/dchatterjee01/analyticaos-demo)
 
-> Requires Google login (OIDC via Streamlit Community Cloud). Local dev works without login — see [Running it locally](#-running-it-locally).
+> No login required. Local dev also works without login — see [Running it locally](#-running-it-locally).
 
 ---
 
@@ -86,14 +86,13 @@ AnalyticaOS turns any dataset into boardroom-ready intelligence. Upload a CSV or
 | Layer | Libraries |
 |---|---|
 | **Frontend / Framework** | Streamlit |
-| **Auth** | Streamlit OIDC (`st.login()` / `st.logout()`) via Google |
 | **Data processing** | Pandas 3.0, NumPy, Polars |
 | **Statistics & Math** | SciPy, statsmodels, networkx |
 | **Machine Learning** | scikit-learn, XGBoost, LightGBM, CatBoost, AutoGluon |
 | **Deep Learning** | PyTorch (CPU-optimized) |
 | **Causal Inference** | DoWhy |
 | **Visualization** | Plotly, Kaleido |
-| **LLMs & Agents** | LangChain, Google Gemini 2.5 Flash (`google-genai`) |
+| **LLMs & Agents** | LangChain, Google Gemini 2.0 Flash (`google-genai`) |
 | **Document generation** | `python-docx` |
 | **Language** | Python 3.12 |
 
@@ -118,21 +117,14 @@ conda activate analyticaos
 pip install -r requirements.txt
 ```
 
-**4. Set up secrets (optional — only needed for Google login and Gemini):**
+**4. Set up secrets (optional — only needed for Gemini-powered pages):**
 
 Create `.streamlit/secrets.toml`:
 ```toml
-[auth]
-redirect_uri = "http://localhost:8501/oauth2callback"
-cookie_secret = "your-cookie-secret"
-client_id = "your-google-client-id"
-client_secret = "your-google-client-secret"
-
-[gemini]
-api_key = "your-gemini-api-key"
+GEMINI_API_KEY = "your-gemini-api-key"
 ```
 
-> If you skip the `[auth]` section, the app runs without login in local dev mode — the auth gate falls back gracefully.
+> If you skip this, the app runs fully — only Gemini-powered pages (Report Generator, NLP QA, Executive Console) will show an error when invoked.
 
 **5. Run:**
 ```bash
@@ -141,80 +133,4 @@ streamlit run app.py
 
 ---
 
-## 🔐 Authentication
-
-AnalyticaOS uses Streamlit's native OIDC login (`st.login()` / `st.logout()`). On Streamlit Community Cloud, Google OAuth is configured via `secrets.toml`. Locally, the app detects the absence of an `[auth]` secrets section and skips the login gate entirely — no credential setup required for development.
-
----
-
 ## 📁 Project Structure
-
-```
-analyticaos/
-├── app.py                  # Main entry point — auth gate, global CSS, NAV router, sidebar
-├── config/
-│   └── settings.py         # Color palette, app metadata (do not edit colors)
-├── pages/                  # One module per file — all 31 page show() functions live here
-│   ├── cleaning.py
-│   ├── eda.py
-│   ├── viz.py
-│   ├── pivot.py
-│   ├── stats.py
-│   ├── experiments.py
-│   ├── causal.py
-│   ├── ml.py
-│   ├── automl.py
-│   ├── deep_learning.py
-│   ├── forecast.py
-│   ├── anomaly.py
-│   ├── questions.py
-│   ├── agents_ui.py
-│   ├── sql_agent_ui.py
-│   ├── executive.py
-│   ├── report.py
-│   ├── nlpqa.py
-│   ├── optimization.py
-│   ├── dashboard.py
-│   ├── cohorts.py
-│   ├── funnel.py
-│   ├── excel_intelligence_ui.py
-│   ├── upload.py
-│   ├── sql_connect.py
-│   ├── sql_nlquery.py
-│   ├── sql_window.py
-│   ├── sql_explainer.py
-│   ├── sql_schema_map.py
-│   ├── sql_visual_builder.py
-│   ├── sql_warehouse.py
-│   └── sql_auto_analytics.py
-├── .streamlit/
-│   └── secrets.toml        # Not committed — see setup instructions above
-└── requirements.txt
-```
-
----
-
-## 🎨 Design System
-
-AnalyticaOS uses a fixed "Scientific Blue" light theme defined entirely in `config/settings.py`:
-
-| Token | Value | Usage |
-|---|---|---|
-| `PRIMARY_COLOR` | `#2A5C8C` | Brand, nav active state, headings |
-| `BACKGROUND_COLOR` | `#FBFCFE` | App background |
-| `SURFACE_COLOR` | `#EFF4FA` | Cards, sidebar |
-| `TEXT_COLOR` | `#1B3A5C` | Body text |
-| `BORDER_COLOR` | `#DCE4EC` | All borders |
-| `MUTED_COLOR` | `#5C7290` | Secondary text, labels |
-
----
-
-## 👤 Author
-
-**Daipayan Chatterjee**  
-GitHub: [@dchatterjee01-prog](https://github.com/dchatterjee01-prog)  
-Live app: [analyticaos-daipayan.streamlit.app](https://analyticaos-daipayan.streamlit.app/)
-
----
-
-*AnalyticaOS — turning raw data into boardroom-ready intelligence, autonomously.*
