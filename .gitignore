@@ -28,8 +28,7 @@ AutogluonModels/
 *.ckpt
 
 # ── DB / connection configs (Stage B, SQL Agent) ────────────────────
-connections/
-
+/connections/
 # ── Stray library artifacts ─────────────────────────────────────────
 5.10.0
 
