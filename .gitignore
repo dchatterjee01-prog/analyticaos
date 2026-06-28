@@ -38,3 +38,7 @@ connections/
 *.docx
 
 data/query_store.db
+
+catboost_info/
+installed-versions.txt
+requirements-detected.txt
