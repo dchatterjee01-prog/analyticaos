@@ -244,14 +244,14 @@ with tab_cte:
     st.caption("Build WITH … SELECT queries including chained and recursive CTEs.")
 
     is_recursive = st.toggle(
-        "Enable RECURSIVE (WITH RECURSIVE — MySQL 8+, PostgreSQL)",
+        "Enable RECURSIVE (WITH RECURSIVE — MySQL 8+, PostgreSQL, SQLite 3.8.3+)",
         value=False,
         key="cte_recursive",
     )
     if is_recursive:
         st.warning(
-            "⚠️ Recursive CTEs require MySQL 8.0+ or PostgreSQL. "
-            "Each recursive block must contain UNION or UNION ALL."
+            "⚠️ Recursive CTEs require MySQL 8.0+, PostgreSQL, or SQLite "
+            "3.8.3+. Each recursive block must contain UNION or UNION ALL."
         )
 
     st.divider()

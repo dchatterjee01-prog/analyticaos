@@ -139,8 +139,7 @@ def analyze_schema_for_warehouse() -> WarehouseAdvice:
 
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        client  = genai.Client(api_key=api_key)
     except Exception as e:
         raise RuntimeError(f"Gemini API setup failed: {e}")
 
@@ -151,8 +150,10 @@ def analyze_schema_for_warehouse() -> WarehouseAdvice:
     )
 
     try:
-        response = model.generate_content(prompt)
-        raw      = response.text.strip()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash", contents=prompt,
+        )
+        raw = response.text.strip()
     except Exception as e:
         raise RuntimeError(f"Gemini API call failed: {e}")
 

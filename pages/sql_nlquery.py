@@ -7,7 +7,7 @@ prefix check.
 """
 
 import streamlit as st
-import google.generativeai as genai
+from google import genai
 from connections.db_engine import get_engine, get_conn_meta, run_query, build_schema_context
 from connections.bridge import apply_bridge
 from connections.sql_guard import check_sql, guard_summary
@@ -27,8 +27,7 @@ def show():
 
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        client  = genai.Client(api_key=api_key)
     except Exception as e:
         st.error(f"Gemini API setup failed: {e}")
         st.stop()
@@ -89,8 +88,9 @@ def show():
         else:
             with st.spinner("Gemini is writing your query…"):
                 try:
-                    response      = model.generate_content(
-                        f"{SYSTEM_PROMPT}\n\nQuestion: {question.strip()}"
+                    response      = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=f"{SYSTEM_PROMPT}\n\nQuestion: {question.strip()}",
                     )
                     generated_sql = response.text.strip()
                     if generated_sql.startswith("```"):

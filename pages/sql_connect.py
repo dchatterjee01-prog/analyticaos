@@ -7,8 +7,13 @@ Stage G: Optimize tab runs EXPLAIN / EXPLAIN ANALYZE via connections.sql_optimiz
 passes through the same sql_guard check as the Query Runner tab.
 """
 
+import os
+import tempfile
+import uuid
+
 import pandas as pd
 import streamlit as st
+from sqlalchemy import inspect
 from connections.db_engine import (
     build_engine, get_engine, get_conn_meta, drop_engine,
     run_query, list_tables, describe_table, table_row_count,
@@ -59,6 +64,41 @@ def show():
             "⚠️ Credentials exist in this session only. "
             "They are lost on refresh or logout."
         )
+
+        # ── One-click demo database (no setup required) ────────────────────
+        st.markdown("### Try it instantly")
+        st.caption(
+            "No database? Spin up a free, private SQLite database in one "
+            "click — perfect for testing every SQL Engine page with your "
+            "own CSV/Excel data."
+        )
+        if st.button(
+            "✨ Create a new database (no setup required)",
+            type="primary",
+            width="stretch",
+            key="connect_quick_sqlite_btn",
+        ):
+            session_id = st.session_state.get("_analyticaos_sqlite_session_id")
+            if not session_id:
+                session_id = uuid.uuid4().hex
+                st.session_state["_analyticaos_sqlite_session_id"] = session_id
+            temp_db_path = os.path.join(
+                tempfile.gettempdir(), f"analyticaos_{session_id}.db"
+            )
+            with st.spinner("Creating your database…"):
+                try:
+                    build_engine(
+                        host="localhost", port=0, database=temp_db_path,
+                        username="", password="", dialect="sqlite",
+                    )
+                    st.success("New SQLite database created — you're connected!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Could not create database: {e}")
+
+        st.divider()
+        st.markdown("### Or connect to your own database")
+
         dialect_options = {v["label"]: k for k, v in DIALECT_REGISTRY.items()}
         dialect_label   = st.selectbox(
             "Database type", options=list(dialect_options.keys()),
@@ -110,6 +150,47 @@ def show():
     if st.button("Disconnect"):
         drop_engine()
         st.rerun()
+
+    # ── First-table import for fresh/empty databases ────────────────────────
+    _engine_for_check = get_engine()
+    _existing_tables  = inspect(_engine_for_check).get_table_names()
+
+    if len(_existing_tables) == 0:
+        st.info(
+            "This database is empty. Upload a CSV or Excel file to create "
+            "your first table."
+        )
+        uploaded_file = st.file_uploader(
+            "Upload data file", type=["csv", "xlsx", "xls"],
+            key="sql_connect_first_upload",
+        )
+        if uploaded_file is not None:
+            default_table_name = (
+                os.path.splitext(uploaded_file.name)[0]
+                .replace(" ", "_").lower()
+            )
+            new_table_name = st.text_input(
+                "Table name", value=default_table_name, key="sql_connect_first_table_name"
+            )
+            if st.button("Import as table", key="sql_connect_first_import_btn"):
+                try:
+                    if uploaded_file.name.lower().endswith(".csv"):
+                        df_upload = pd.read_csv(uploaded_file)
+                    else:
+                        df_upload = pd.read_excel(uploaded_file)
+
+                    df_upload.to_sql(
+                        new_table_name, _engine_for_check,
+                        if_exists="replace", index=False,
+                    )
+                    st.success(
+                        f"Imported {len(df_upload):,} rows into table "
+                        f"'{new_table_name}'."
+                    )
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Import failed: {e}")
+        st.divider()
 
     tab_query, tab_optimize, tab_export = st.tabs(["⚡ Query Runner", "🚀 Optimize", "📤 Export"])
 
